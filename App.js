@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DeviceEventEmitter, ActivityIndicator, View, Platform } from 'react-native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -9,12 +10,22 @@ import LoginScreen from './src/screens/LoginScreen';
 import CashierDashboard from './src/screens/CashierDashboard';
 import AdminDashboard from './src/screens/AdminDashboard';
 import ManagerDashboard from './src/screens/ManagerDashboard';
-import { ActivityIndicator, View, Platform } from 'react-native';
+import VoiceWidget from './src/components/VoiceWidget';
 
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
   const { user, isAuthenticated, loading } = useAuth();
+  const navigation = useNavigation();
+
+  const handleNavigate = (page, subtab) => {
+    // Notify active dashboards via event emitter
+    DeviceEventEmitter.emit('navigate_tab', { page, subtab });
+    
+    if (navigation && page) {
+       navigation.navigate(page, { subtab });
+    }
+  };
 
   if (loading) {
     return (
@@ -25,6 +36,7 @@ const AppNavigator = () => {
   }
 
   return (
+    <>
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
         <>
@@ -47,6 +59,8 @@ const AppNavigator = () => {
         </>
       )}
     </Stack.Navigator>
+    {isAuthenticated && <VoiceWidget onNavigate={handleNavigate} />}
+    </>
   );
 };
 

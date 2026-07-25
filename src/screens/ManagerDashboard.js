@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { orderService, tableService } from '../services/api';
 import { 
@@ -31,6 +31,12 @@ export default function HotelManagerDashboard({ navigation }) {
 
   useEffect(() => {
     fetchData();
+    const navSub = DeviceEventEmitter.addListener('navigate_tab', (data) => {
+      if (data && data.page) {
+        setActiveTab(data.page.toLowerCase());
+      }
+    });
+    return () => navSub.remove();
   }, [activeTab]);
 
   const fetchData = async () => {
@@ -123,7 +129,7 @@ export default function HotelManagerDashboard({ navigation }) {
       </View>
 
       <View style={styles.recentOrdersList}>
-        {orders.slice(0, 5).map((o, i) => (
+        {[...orders].sort((a, b) => b.order_id - a.order_id).slice(0, 5).map((o, i) => (
           <View key={i} style={styles.recentOrderRow}>
             <View style={styles.recentOrderLeft}>
               <Text style={styles.recentOrderId}>#{o.order_id}</Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform, DeviceEventEmitter } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { restaurantService, managerService, tableService, reportsService } from '../services/api';
 import {
@@ -39,6 +39,12 @@ export default function AdminDashboard({ navigation }) {
 
   useEffect(() => {
     fetchData();
+    const navSub = DeviceEventEmitter.addListener('navigate_tab', (data) => {
+      if (data && data.page) {
+        setActiveTab(data.page.toLowerCase());
+      }
+    });
+    return () => navSub.remove();
   }, [activeTab]);
 
   const fetchData = async () => {
