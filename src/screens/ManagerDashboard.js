@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from
 import { useAuth } from '../context/AuthContext';
 import { orderService, tableService } from '../services/api';
 import { LogOut, LayoutDashboard, UtensilsCrossed, ShoppingCart, Table2, Package, Settings, Menu, X } from 'lucide-react-native';
+import MenuManagement from '../components/MenuManagement';
+import OrdersManagement from '../components/OrdersManagement';
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 600;
@@ -112,8 +114,8 @@ export default function HotelManagerDashboard({ navigation }) {
         {/* Main Content Area */}
         <View style={styles.mainContent}>
           {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'menu' && renderPlaceholder('Menu Management')}
-          {activeTab === 'orders' && renderPlaceholder('Orders Management')}
+          {activeTab === 'menu' && <MenuManagement />}
+          {activeTab === 'orders' && <OrdersManagement />}
           {activeTab === 'tables' && renderPlaceholder('Tables Management')}
           {activeTab === 'inventory' && renderPlaceholder('Inventory Management')}
           {activeTab === 'settings' && renderPlaceholder('Settings')}
