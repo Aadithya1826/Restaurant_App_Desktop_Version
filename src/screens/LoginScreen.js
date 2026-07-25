@@ -71,6 +71,7 @@ const LoginScreen = ({ navigation }) => {
 
           {/* Submit Button */}
           <TouchableOpacity
+            dataSet={{ hover: 'btn' }}
             style={[styles.btn, styles.btnPrimary, loading && styles.btnDisabled]}
             onPress={handleSubmit}
             disabled={loading}

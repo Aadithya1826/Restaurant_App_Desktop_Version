@@ -144,106 +144,137 @@ export default function CashierDashboard({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Data Udipi POS</Text>
-          <Text style={styles.headerSubtitle}>Cashier</Text>
+          <View style={styles.logoBox}><Text style={styles.logoText}>DU</Text></View>
+          <View>
+            <Text style={styles.headerTitle}>Data Udipi Restaurant</Text>
+            <Text style={styles.headerSubtitle}>Counter POS - Cashier</Text>
+          </View>
         </View>
-        <Text style={styles.billNo}>Bill No: {billNo}</Text>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={16} color="#ef4444" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        
+        <View style={styles.headerCenter}>
+          <Text style={styles.billNo}>Bill No: {billNo}</Text>
+        </View>
+        
+        <View style={styles.headerRight}>
+          <Text style={styles.headerDate}>{new Date().toLocaleDateString()} - Items in cart: {cart.length}</Text>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <LogOut size={16} color="#ef4444" style={{marginRight: 6}} />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {/* Main Layout */}
       <View style={[styles.mainLayout, { flexDirection: isTablet ? 'row' : 'column' }]}>
         {/* Left Panel */}
-        <View style={[styles.leftPanel, { flex: isTablet ? 3 : 1 }]}>
-          <View style={styles.controlsRow}>
-            <View style={styles.pickerContainer}>
-              <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={{ height: 40, border: 'none', outline: 'none' }}>
-                <Picker.Item label="Take Away" value="take-away" />
-                <Picker.Item label="Dine In" value="dine-in" />
+        <View style={[styles.leftPanel, { flex: isTablet ? 7 : 1 }]}>
+          
+          <View style={styles.inputStack}>
+            <View style={styles.pickerWrapper}>
+              <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker}>
+                <Picker.Item label="[7] Take Away" value="take-away" />
+                <Picker.Item label="[8] Dine In" value="dine-in" />
               </Picker>
             </View>
             <TextInput
               style={styles.searchInput}
-              placeholder="Item Code"
+              placeholder="Enter item code (e.g. C01)"
               value={productCodeInput}
               onChangeText={setProductCodeInput}
               onSubmitEditing={addProductToCart}
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search..."
+              placeholder="Search item..."
               value={descriptionInput}
               onChangeText={setDescriptionInput}
             />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')}>
-              <Text style={selectedCategoryId === 'All' ? styles.catTextActive : styles.catText}>All</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
+            <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')} dataSet={{ hover: 'btn' }}>
+              <Text style={[styles.catText, selectedCategoryId === 'All' && styles.catTextActive]}>All</Text>
             </TouchableOpacity>
             {categories.map(cat => (
-              <TouchableOpacity key={cat.id} style={[styles.catBtn, selectedCategoryId === cat.id && styles.catBtnActive]} onPress={() => setSelectedCategoryId(cat.id)}>
-                <Text style={selectedCategoryId === cat.id ? styles.catTextActive : styles.catText}>{cat.name}</Text>
+              <TouchableOpacity key={cat.id} style={[styles.catBtn, selectedCategoryId === cat.id && styles.catBtnActive]} onPress={() => setSelectedCategoryId(cat.id)} dataSet={{ hover: 'btn' }}>
+                <Text style={[styles.catText, selectedCategoryId === cat.id && styles.catTextActive]}>{cat.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          <FlatList
-            data={filteredItems}
-            keyExtractor={item => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.itemRow} onPress={() => addItemToCart(item)}>
-                <Text style={styles.itemCode}>{item.item_code}</Text>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <View style={styles.itemPriceCol}>
-                  <Text style={styles.itemPrice}>₹{item.price}</Text>
-                  <View style={styles.addBtn}><Text style={{ color: 'white' }}>+</Text></View>
+          <View style={styles.tableContainer}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.thText, { width: 80 }]}>CODE</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>ITEM</Text>
+              <Text style={[styles.thText, { width: 100, textAlign: 'right', paddingRight: 40 }]}>PRICE</Text>
+            </View>
+            <FlatList
+              data={filteredItems}
+              keyExtractor={item => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              renderItem={({ item }) => (
+                <View style={styles.tableRow} dataSet={{ hover: 'nav' }}>
+                  <Text style={[styles.tdCode, { width: 80 }]}>{item.item_code || item.id}</Text>
+                  <Text style={[styles.tdName, { flex: 1 }]}>{item.name}</Text>
+                  <View style={{ width: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <Text style={styles.tdPrice}>₹{(item.price || 0).toFixed(2)}</Text>
+                    <TouchableOpacity style={styles.addSquareBtn} onPress={() => addItemToCart(item)} dataSet={{ hover: 'btn' }}>
+                      <Text style={styles.addSquareText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </TouchableOpacity>
-            )}
-          />
+              )}
+            />
+          </View>
         </View>
 
         {/* Right Panel (Cart) */}
-        <View style={[styles.rightPanel, { flex: isTablet ? 2 : 1 }]}>
-          <View style={styles.cartHeader}>
-            <Text style={styles.cartTitle}>Current Order ({cart.length})</Text>
-            <TouchableOpacity onPress={() => setCart([])}>
+        <View style={[styles.rightPanel, { flex: isTablet ? 3 : 1 }]}>
+          <View style={styles.cartHeaderTop}>
+            <Text style={styles.cartHeaderTitle}>Current order</Text>
+            <TouchableOpacity onPress={() => setCart([])} dataSet={{ hover: 'btn' }}>
               <Text style={styles.clearText}>Clear</Text>
             </TouchableOpacity>
           </View>
-
+          <Text style={styles.cartSubtitle}>{cart.length} lines · {cart.reduce((a,b)=>a+b.qty,0)} items</Text>
+          
           <FlatList
             data={cart}
             keyExtractor={item => item.id.toString()}
+            style={{ flex: 1, paddingHorizontal: 24 }}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
-              <View style={styles.cartItem}>
+              <View style={styles.cartRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cartItemName}>{item.description}</Text>
-                  <Text style={styles.cartItemRate}>₹{item.rate.toFixed(2)}</Text>
+                  <Text style={styles.cartRowName}>{item.description}</Text>
+                  <Text style={styles.cartRowRate}>₹{item.rate.toFixed(2)}</Text>
                 </View>
-                <View style={styles.qtyControls}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, -1)}><Text>-</Text></TouchableOpacity>
-                  <Text style={styles.qtyText}>{item.qty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, 1)}><Text>+</Text></TouchableOpacity>
+                <View style={styles.cartRowControls}>
+                  <TouchableOpacity style={styles.cartQtyBtn} onPress={() => updateQty(item.id, -1)}><Text>-</Text></TouchableOpacity>
+                  <Text style={styles.cartQtyText}>{item.qty}</Text>
+                  <TouchableOpacity style={styles.cartQtyBtn} onPress={() => updateQty(item.id, 1)}><Text>+</Text></TouchableOpacity>
                 </View>
-                <Text style={styles.cartItemTotal}>₹{item.amount.toFixed(2)}</Text>
+                <Text style={styles.cartRowTotal}>₹{item.amount.toFixed(2)}</Text>
               </View>
             )}
           />
 
-          <View style={styles.cartFooter}>
-            <TouchableOpacity style={styles.futureSaleBtn} onPress={() => setShowFutureSaleModal(true)}>
-              <Text>+ Future Sale</Text>
+          <View style={styles.cartFooterArea}>
+            <TouchableOpacity style={styles.futureSaleLightBtn} onPress={() => setShowFutureSaleModal(true)} dataSet={{ hover: 'btn' }}>
+              <Text style={styles.futureSaleLightText}>+ Future Sale</Text>
             </TouchableOpacity>
-            <View style={styles.summaryRow}>
-              <Text style={styles.totalText}>Total</Text>
-              <Text style={styles.totalValue}>₹{totalAmount.toFixed(2)}</Text>
+            <View style={styles.subtotalRow}>
+              <Text style={styles.subtotalLabel}>Subtotal</Text>
+              <Text style={styles.subtotalValue}>₹{totalAmount.toFixed(2)}</Text>
             </View>
-            <TouchableOpacity style={styles.chargeBtn} onPress={handleCheckout}>
-              <Text style={styles.chargeBtnText}>Charge ₹{totalAmount.toFixed(2)}</Text>
+            <View style={styles.totalRowFixed}>
+              <Text style={styles.totalLabelFixed}>Total</Text>
+              <Text style={styles.totalValueFixed}>₹{totalAmount.toFixed(2)}</Text>
+            </View>
+            <TouchableOpacity style={styles.chargeBtnDark} onPress={handleCheckout} dataSet={{ hover: 'btn' }}>
+              <Text style={styles.chargeBtnDarkText}>Charge ₹{totalAmount.toFixed(2)}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -260,46 +291,68 @@ export default function CashierDashboard({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f4f6' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  headerSubtitle: { color: 'gray' },
-  billNo: { fontSize: 24, fontWeight: 'bold' },
-  logoutBtn: { flexDirection: 'row', backgroundColor: '#fee2e2', padding: 10, borderRadius: 8, alignItems: 'center', gap: 5, cursor: 'pointer' },
-  logoutText: { color: '#ef4444', fontWeight: 'bold' },
-  mainLayout: { flex: 1 },
-  leftPanel: { backgroundColor: '#fff', margin: 10, borderRadius: 8, padding: 10 },
-  controlsRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  pickerContainer: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, justifyContent: 'center' },
-  searchInput: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, outlineStyle: 'none' },
-  categoryScroll: { maxHeight: 50, marginBottom: 10 },
-  catBtn: { paddingHorizontal: 15, paddingVertical: 8, backgroundColor: '#f3f4f6', borderRadius: 20, marginRight: 10, cursor: 'pointer' },
-  catBtnActive: { backgroundColor: '#3b82f6' },
-  catText: { color: 'gray' },
-  catTextActive: { color: 'white', fontWeight: 'bold' },
-  itemRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#eee', alignItems: 'center', cursor: 'pointer' },
-  itemCode: { width: 60, fontWeight: 'bold', color: 'gray' },
-  itemName: { flex: 1, fontSize: 16 },
-  itemPriceCol: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  itemPrice: { fontWeight: 'bold' },
-  addBtn: { backgroundColor: '#3b82f6', width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  rightPanel: { backgroundColor: '#fff', margin: 10, borderRadius: 8, padding: 10 },
-  cartHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, paddingBottom: 10, marginBottom: 10 },
-  cartTitle: { fontSize: 18, fontWeight: 'bold' },
-  clearText: { color: '#ef4444', cursor: 'pointer' },
-  cartItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#eee' },
-  cartItemName: { fontWeight: 'bold' },
-  cartItemRate: { color: 'gray' },
-  qtyControls: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10 },
-  qtyBtn: { backgroundColor: '#f3f4f6', width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderRadius: 15, cursor: 'pointer' },
-  qtyText: { marginHorizontal: 10, fontWeight: 'bold' },
-  cartItemTotal: { width: 70, textAlign: 'right', fontWeight: 'bold' },
-  cartFooter: { paddingTop: 10, borderTopWidth: 1, borderColor: '#eee' },
-  futureSaleBtn: { backgroundColor: '#e5e7eb', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 10, cursor: 'pointer' },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  totalText: { fontSize: 20, fontWeight: 'bold' },
-  totalValue: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
-  chargeBtn: { backgroundColor: '#10b981', padding: 15, borderRadius: 8, alignItems: 'center', cursor: 'pointer' },
-  chargeBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#ffffff', overflow: 'hidden', height: '100vh', maxHeight: '100vh', minHeight: 0 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  logoBox: { width: 32, height: 32, backgroundColor: '#f3f4f6', borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  logoText: { fontWeight: 'bold', color: '#6b7280', fontSize: 14 },
+  headerTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  headerSubtitle: { fontSize: 12, color: '#6b7280' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  billNo: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  headerRight: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
+  headerDate: { fontSize: 13, color: '#6b7280', marginRight: 16 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, cursor: 'pointer' },
+  logoutText: { color: '#ef4444', fontWeight: '500', fontSize: 13 },
+  
+  mainLayout: { flex: 1, flexDirection: 'row', minHeight: 0 },
+  leftPanel: { flex: 7, backgroundColor: '#ffffff', paddingHorizontal: 32, paddingTop: 24, paddingBottom: 0, borderRightWidth: 1, borderColor: '#e5e7eb', minHeight: 0 },
+  
+  inputStack: { gap: 16, marginBottom: 24 },
+  pickerWrapper: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, backgroundColor: '#fff', height: 48, justifyContent: 'center', width: '30%' },
+  picker: { height: 48, borderWidth: 0, outlineStyle: 'none', backgroundColor: 'transparent', paddingHorizontal: 16 },
+  searchInput: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 16, fontSize: 14, backgroundColor: '#fff', outlineStyle: 'none' },
+  
+  categoryScroll: { flexGrow: 0, marginBottom: 16, maxHeight: 40 },
+  categoryContainer: { gap: 12, paddingBottom: 8 },
+  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff', cursor: 'pointer', height: 36, justifyContent: 'center' },
+  catBtnActive: { backgroundColor: '#f3f4f6', borderColor: '#d1d5db' },
+  catText: { fontSize: 13, color: '#111827', fontWeight: '500' },
+  catTextActive: { fontWeight: '600' },
+  
+  tableContainer: { flex: 1, borderTopWidth: 1, borderColor: '#e5e7eb', minHeight: 0 },
+  tableHeader: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
+  thText: { fontSize: 11, fontWeight: '600', color: '#6b7280', letterSpacing: 0.5 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#f3f4f6' },
+  tdCode: { fontSize: 13, color: '#9ca3af', fontWeight: '500' },
+  tdName: { fontSize: 14, color: '#111827', fontWeight: '500' },
+  tdPrice: { fontSize: 14, color: '#6b7280', marginRight: 16 },
+  addSquareBtn: { width: 32, height: 32, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', cursor: 'pointer' },
+  addSquareText: { fontSize: 18, color: '#111827', marginTop: -2 },
+  
+  rightPanel: { flex: 3, backgroundColor: '#ffffff', flexDirection: 'column', minHeight: 0 },
+  cartHeaderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 32 },
+  cartHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  clearText: { fontSize: 13, color: '#6b7280', cursor: 'pointer' },
+  cartSubtitle: { fontSize: 13, color: '#6b7280', paddingHorizontal: 24, marginTop: 4, marginBottom: 24 },
+  
+  cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderColor: '#f3f4f6' },
+  cartRowName: { fontSize: 14, fontWeight: '500', color: '#111827', marginBottom: 4 },
+  cartRowRate: { fontSize: 14, color: '#6b7280' },
+  cartRowControls: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 4, marginRight: 16 },
+  cartQtyBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  cartQtyText: { fontSize: 14, fontWeight: '500', minWidth: 20, textAlign: 'center' },
+  cartRowTotal: { fontSize: 13, color: '#6b7280', width: 60, textAlign: 'right' },
+  
+  cartFooterArea: { padding: 24, borderTopWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
+  futureSaleLightBtn: { backgroundColor: '#f3f4f6', paddingVertical: 12, borderRadius: 6, alignItems: 'center', marginBottom: 24, cursor: 'pointer' },
+  futureSaleLightText: { fontSize: 13, fontWeight: '500', color: '#374151' },
+  subtotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  subtotalLabel: { fontSize: 13, color: '#6b7280' },
+  subtotalValue: { fontSize: 13, fontWeight: '500', color: '#111827' },
+  totalRowFixed: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  totalLabelFixed: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  totalValueFixed: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  chargeBtnDark: { backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 6, alignItems: 'center', cursor: 'pointer' },
+  chargeBtnDarkText: { color: '#ffffff', fontSize: 16, fontWeight: '600' }
 });

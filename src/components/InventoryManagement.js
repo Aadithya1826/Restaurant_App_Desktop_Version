@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, FlatList, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Modal, Platform } from 'react-native';
 import { inventoryService } from '../services/api';
-import { Plus, Package, TrendingDown, CheckCircle2, Edit2, Trash2, Search } from 'lucide-react-native';
+import { Plus, Package, TrendingDown, CheckCircle2, Edit2, Trash2, Search, X, FileScan, CheckCircle, AlertTriangle } from 'lucide-react-native';
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState([]);
@@ -24,6 +24,32 @@ export default function InventoryManagement() {
     finally { setLoading(false); }
   };
 
+  const handleScanSheet = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,.pdf,.csv,.xlsx';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          setLoading(true);
+          const formData = new FormData();
+          formData.append('file', file);
+          await inventoryService.scanInventory(formData);
+          fetchInventory();
+        } catch (err) {
+          console.error(err);
+          alert('Failed to scan sheet.');
+          setLoading(false);
+        }
+      };
+      input.click();
+    } else {
+      alert("File uploading is currently only supported on the web platform.");
+    }
+  };
+
   const handleDelete = (id) => {
     if(window.confirm && window.confirm("Delete this item?")) {
       inventoryService.deleteItem(id).then(() => fetchInventory()).catch(() => alert("Could not delete item"));
@@ -34,9 +60,9 @@ export default function InventoryManagement() {
     setEditingItem(item);
     setFormData(item ? {
       name: item.name,
-      open_stock: item.open_stock.toString(),
-      purchase: item.purchase.toString(),
-      issue: item.issue.toString(),
+      open_stock: (item.open_stock || 0).toString(),
+      purchase: (item.purchase || 0).toString(),
+      issue: (item.issue || 0).toString(),
       unit: item.unit || 'units'
     } : { name: '', open_stock: '0', purchase: '0', issue: '0', unit: 'units' });
     setIsModalOpen(true);
@@ -63,127 +89,243 @@ export default function InventoryManagement() {
   };
 
   const filteredInventory = inventory.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  const lowStockItems = inventory.filter(i => i.balance < 5);
-  const inStockItems = inventory.filter(i => i.balance >= 5);
+  const lowStockItems = inventory.filter(i => {
+    const total = (i.open_stock || 0) + (i.purchase || 0);
+    const balance = total - (i.issue || 0);
+    return balance < 5;
+  });
+  const inStockItems = inventory.filter(i => {
+    const total = (i.open_stock || 0) + (i.purchase || 0);
+    const balance = total - (i.issue || 0);
+    return balance >= 5;
+  });
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Inventory</Text>
-          <Text style={{color: 'gray'}}>{inventory.length} items tracked • {lowStockItems.length} low stock</Text>
+          <Text style={styles.subtitle}>{inventory.length} items tracked · {lowStockItems.length} low stock</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
-          <Plus color="white" size={20} />
-          <Text style={{color:'white', fontWeight:'bold'}}>Add Item</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.statsCardContainer}>
-        <View style={styles.statBox}>
-          <Package color="gray" size={30} /><View><Text style={styles.statValue}>{inventory.length}</Text><Text style={styles.statLabel}>Total</Text></View>
-        </View>
-        <View style={styles.statBox}>
-          <TrendingDown color="#ff4d4d" size={30} /><View><Text style={[styles.statValue, {color: '#ff4d4d'}]}>{lowStockItems.length}</Text><Text style={[styles.statLabel, {color: '#ff4d4d'}]}>Low Stock</Text></View>
-        </View>
-        <View style={styles.statBox}>
-          <CheckCircle2 color="#16a34a" size={30} /><View><Text style={[styles.statValue, {color: '#16a34a'}]}>{inStockItems.length}</Text><Text style={[styles.statLabel, {color: '#16a34a'}]}>In Stock</Text></View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
+            <Plus color="white" size={16} style={{ marginRight: 6 }} />
+            <Text style={styles.addBtnText}>Add Item</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.addBtn, { marginLeft: 12 }]} onPress={handleScanSheet}>
+            <FileScan color="white" size={16} style={{ marginRight: 6 }} />
+            <Text style={styles.addBtnText}>Scan Sheet</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.searchBar}>
-        <Search color="gray" size={20} />
-        <TextInput style={styles.searchInput} placeholder="Search inventory..." value={searchTerm} onChangeText={setSearchTerm} />
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrapper, { backgroundColor: '#f1f5f9' }]}>
+            <Package color="#0f172a" size={20} />
+          </View>
+          <View>
+            <Text style={styles.statValue}>{inventory.length}</Text>
+            <Text style={styles.statLabel}>Total Items</Text>
+          </View>
+        </View>
+        
+        <View style={[styles.statCard, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
+          <View style={[styles.statIconWrapper, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <TrendingDown color="#ef4444" size={20} />
+          </View>
+          <View>
+            <Text style={[styles.statValue, { color: '#ef4444' }]}>{lowStockItems.length}</Text>
+            <Text style={[styles.statLabel, { color: '#ef4444' }]}>Low Stock</Text>
+          </View>
+        </View>
+        
+        <View style={[styles.statCard, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
+          <View style={[styles.statIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+            <CheckCircle2 color="#10b981" size={20} />
+          </View>
+          <View>
+            <Text style={[styles.statValue, { color: '#10b981' }]}>{inStockItems.length}</Text>
+            <Text style={[styles.statLabel, { color: '#10b981' }]}>In Stock</Text>
+          </View>
+        </View>
       </View>
 
-      {loading ? <Text>Loading...</Text> : (
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Search color="#94a3b8" size={18} style={{ marginLeft: 16 }} />
+        <TextInput 
+          style={styles.searchInput} 
+          placeholder="Search inventory..." 
+          placeholderTextColor="#94a3b8"
+          value={searchTerm} 
+          onChangeText={setSearchTerm} 
+        />
+      </View>
+
+      {/* Data Table */}
+      {loading ? <Text style={{ padding: 20 }}>Loading...</Text> : (
         <View style={styles.tableContainer}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.th, {flex: 2}]}>Item</Text>
+            <Text style={[styles.th, { flex: 2.5 }]}>Item</Text>
             <Text style={styles.th}>Open</Text>
             <Text style={styles.th}>Purchase</Text>
+            <Text style={styles.th}>Total</Text>
             <Text style={styles.th}>Issue</Text>
-            <Text style={styles.th}>Balance</Text>
+            <Text style={[styles.th, { fontWeight: 'bold' }]}>Balance</Text>
             <Text style={styles.th}>Unit</Text>
-            <Text style={styles.th}>Actions</Text>
+            <Text style={[styles.th, { flex: 1.5 }]}>Last Restocked</Text>
+            <Text style={[styles.th, { flex: 1.2 }]}>Status</Text>
+            <Text style={[styles.th, { flex: 0.8, textAlign: 'right', paddingRight: 16 }]}>Actions</Text>
           </View>
-          <FlatList
-            data={filteredInventory}
-            keyExtractor={item => item.id.toString()}
-            renderItem={({ item }) => {
-              const isLow = item.balance < 5;
-              return (
-                <View style={styles.tableRow}>
-                  <View style={[styles.td, {flex: 2, flexDirection:'row', alignItems:'center', gap:10}]}>
-                    <View style={[styles.iconBox, {backgroundColor: isLow ? '#fff0f0' : '#f0fdf4'}]}>
-                      <Package color={isLow ? '#ff4d4d' : '#16a34a'} size={16} />
-                    </View>
-                    <Text style={{fontWeight:'bold'}}>{item.name}</Text>
+          
+          {filteredInventory.map((item, index) => {
+            const open = item.open_stock || 0;
+            const purchase = item.purchase || 0;
+            const total = open + purchase;
+            const issue = item.issue || 0;
+            const balance = total - issue;
+            const isLow = balance < 5;
+            
+            return (
+              <View key={item.id} style={styles.tableRow}>
+                {/* Item Name */}
+                <View style={[styles.td, { flex: 2.5, flexDirection: 'row', alignItems: 'center' }]}>
+                  <View style={[styles.itemIconBox, { backgroundColor: isLow ? '#fef2f2' : '#f0fdf4' }]}>
+                    <Package color={isLow ? '#ef4444' : '#10b981'} size={14} />
                   </View>
-                  <Text style={styles.td}>{item.open_stock}</Text>
-                  <Text style={styles.td}>{item.purchase}</Text>
-                  <Text style={[styles.td, {color:'#ff4d4d'}]}>{item.issue}</Text>
-                  <Text style={[styles.td, {fontWeight:'bold', color: isLow ? '#ff4d4d' : 'black'}]}>{item.balance}</Text>
-                  <Text style={[styles.td, {color:'gray'}]}>{item.unit}</Text>
-                  <View style={[styles.td, {flexDirection: 'row', gap: 10}]}>
-                    <TouchableOpacity onPress={() => openModal(item)}><Edit2 size={16} color="gray" /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(item.id)}><Trash2 size={16} color="red" /></TouchableOpacity>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                </View>
+                
+                {/* Metrics */}
+                <Text style={[styles.td, open === 0 && styles.dimText]}>{open}</Text>
+                <Text style={[styles.td, purchase === 0 && styles.dimText]}>{purchase}</Text>
+                <Text style={[styles.td, { fontWeight: '600' }, total === 0 && styles.dimText]}>{total}</Text>
+                <Text style={[styles.td, { color: '#ef4444' }, issue === 0 && styles.dimText]}>{issue}</Text>
+                <Text style={[styles.td, styles.balanceText, isLow && { color: '#ef4444' }]}>{balance}</Text>
+                <Text style={[styles.td, { color: '#94a3b8', fontSize: 13 }]}>{item.unit || 'units'}</Text>
+                <Text style={[styles.td, { flex: 1.5, color: '#94a3b8', fontSize: 12 }]}>More than a month ago</Text>
+                
+                {/* Status */}
+                <View style={[styles.td, { flex: 1.2 }]}>
+                  <View style={[styles.statusPill, isLow ? styles.statusPillLow : styles.statusPillOk]}>
+                    {isLow ? <AlertTriangle size={12} color="#ef4444" style={{marginRight: 4}} /> : <CheckCircle size={12} color="#10b981" style={{marginRight: 4}} />}
+                    <Text style={[styles.statusPillText, isLow ? { color: '#ef4444' } : { color: '#10b981' }]}>{isLow ? 'Low Stock' : 'In Stock'}</Text>
                   </View>
                 </View>
-              );
-            }}
-          />
+                
+                {/* Actions */}
+                <View style={[styles.td, { flex: 0.8, flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 16 }]}>
+                  <TouchableOpacity onPress={() => openModal(item)} style={{ padding: 4 }}><Edit2 size={16} color="#f59e0b" /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ padding: 4, marginLeft: 8 }}><Trash2 size={16} color="#ef4444" /></TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
 
-      <Modal visible={isModalOpen} transparent animationType="slide">
+      {/* Floating Add/Edit Modal */}
+      <Modal visible={isModalOpen} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingItem ? 'Edit Item' : 'Add Item'}</Text>
-            <ScrollView>
-              <TextInput style={styles.input} placeholder="Item Name" value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
-              <View style={{flexDirection:'row', gap:10}}>
-                <TextInput style={[styles.input, {flex:1}]} placeholder="Open Stock" keyboardType="numeric" value={formData.open_stock} onChangeText={t => setFormData({...formData, open_stock: t})} />
-                <TextInput style={[styles.input, {flex:1}]} placeholder="Purchase" keyboardType="numeric" value={formData.purchase} onChangeText={t => setFormData({...formData, purchase: t})} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)}><X color="#94a3b8" size={20} /></TouchableOpacity>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Item Name</Text>
+              <TextInput style={styles.input} placeholder="e.g. Rice Flour" value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
+            </View>
+
+            <View style={styles.inlineFormGroup}>
+              <View style={styles.flexInput}>
+                <Text style={styles.label}>Open Stock</Text>
+                <TextInput style={styles.input} keyboardType="numeric" placeholder="0" value={formData.open_stock} onChangeText={t => setFormData({...formData, open_stock: t})} />
               </View>
-              <View style={{flexDirection:'row', gap:10}}>
-                <TextInput style={[styles.input, {flex:1}]} placeholder="Issue" keyboardType="numeric" value={formData.issue} onChangeText={t => setFormData({...formData, issue: t})} />
-                <TextInput style={[styles.input, {flex:1}]} placeholder="Unit (e.g. kg)" value={formData.unit} onChangeText={t => setFormData({...formData, unit: t})} />
+              <View style={styles.flexInput}>
+                <Text style={styles.label}>Purchase</Text>
+                <TextInput style={styles.input} keyboardType="numeric" placeholder="0" value={formData.purchase} onChangeText={t => setFormData({...formData, purchase: t})} />
               </View>
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsModalOpen(false)}><Text>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={{color: 'white'}}>Save</Text></TouchableOpacity>
+              <View style={styles.flexInput}>
+                <Text style={styles.label}>Issue</Text>
+                <TextInput style={styles.input} keyboardType="numeric" placeholder="0" value={formData.issue} onChangeText={t => setFormData({...formData, issue: t})} />
+              </View>
+              <View style={styles.flexInput}>
+                <Text style={styles.label}>Unit</Text>
+                <TextInput style={styles.input} placeholder="e.g. kg" value={formData.unit} onChangeText={t => setFormData({...formData, unit: t})} />
+              </View>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)} style={styles.cancelBtn}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity onPress={handleSave} style={styles.saveBtn}><Text style={styles.saveBtnText}>{editingItem ? 'Save Changes' : 'Add Item'}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f4f6', padding: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 28, fontWeight: 'bold' },
-  addBtn: { backgroundColor: '#f5620c', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, cursor: 'pointer' },
-  statsCardContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 20, marginBottom: 20 },
-  statBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 20, backgroundColor: 'white', borderRadius: 10, padding: 20, elevation: 1 },
-  statValue: { fontSize: 24, fontWeight: 'bold' },
-  statLabel: { color: 'gray', fontSize: 14 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 10, borderRadius: 20, marginBottom: 20, width: 400 },
-  searchInput: { flex: 1, marginLeft: 10, outlineStyle: 'none' },
-  tableContainer: { flex: 1, backgroundColor: 'white', borderRadius: 10, overflow: 'hidden', elevation: 1 },
-  tableHeader: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, borderColor: '#eee', backgroundColor: '#f9f9f9' },
-  th: { flex: 1, fontWeight: 'bold', color: 'gray' },
-  tableRow: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, borderColor: '#eee', alignItems: 'center' },
-  td: { flex: 1 },
-  iconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: 'white', padding: 30, borderRadius: 10, width: 500, maxHeight: '80%' },
-  modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 5, padding: 15, marginBottom: 15, outlineStyle: 'none' },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
-  cancelBtn: { padding: 15, cursor: 'pointer' },
-  saveBtn: { padding: 15, backgroundColor: '#f5620c', borderRadius: 5, cursor: 'pointer' }
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  
+  // Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
+  subtitle: { color: '#64748b', fontSize: 13, marginTop: 4 },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  addBtn: { backgroundColor: '#ff6b35', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  addBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  
+  // Stats
+  statsContainer: { flexDirection: 'row', gap: 24, marginBottom: 32 },
+  statCard: { flex: 1, padding: 24, borderRadius: 16, backgroundColor: 'white', flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9' },
+  statIconWrapper: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  statValue: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
+  statLabel: { color: '#64748b', fontSize: 13, fontWeight: '500', marginTop: 2 },
+  
+  // Search
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 24, paddingVertical: 4, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0', width: 400, maxWidth: '100%' },
+  searchInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#0f172a', outlineStyle: 'none' },
+  
+  // Table
+  tableContainer: { backgroundColor: 'white', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
+  tableHeader: { flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  th: { flex: 1, fontSize: 12, fontWeight: '600', color: '#64748b' },
+  tableRow: { flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#f1f5f9', alignItems: 'center' },
+  td: { flex: 1, fontSize: 14, color: '#0f172a' },
+  dimText: { color: '#cbd5e1' },
+  
+  itemIconBox: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  itemName: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
+  balanceText: { fontWeight: 'bold', fontSize: 15 },
+  
+  statusPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  statusPillOk: { backgroundColor: 'rgba(16, 185, 129, 0.05)', borderColor: 'rgba(16, 185, 129, 0.2)' },
+  statusPillLow: { backgroundColor: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)' },
+  statusPillText: { fontSize: 11, fontWeight: 'bold' },
+  
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { backgroundColor: 'white', width: '100%', maxWidth: 500, borderRadius: 24, padding: 32, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
+  
+  formGroup: { marginBottom: 20 },
+  inlineFormGroup: { flexDirection: 'row', gap: 16, marginBottom: 32 },
+  flexInput: { flex: 1 },
+  label: { fontSize: 12, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, color: '#0f172a', outlineStyle: 'none' },
+  
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  cancelBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
+  cancelBtnText: { color: '#64748b', fontSize: 14, fontWeight: 'bold' },
+  saveBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24, backgroundColor: '#ff6b35' },
+  saveBtnText: { color: 'white', fontSize: 14, fontWeight: 'bold' }
 });

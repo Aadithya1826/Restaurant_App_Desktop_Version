@@ -25,9 +25,10 @@ const OnboardingScreen = ({ navigation }) => {
     }
   }, [isAuthenticated, user, navigation]);
 
-  const [step, setStep] = useState('role'); 
+  const [step, setStep] = useState('role');
   const [selectedRole, setSelectedRole] = useState(null);
-  const [authMode, setAuthMode] = useState('login'); 
+  const [hoveredRole, setHoveredRole] = useState(null);
+  const [authMode, setAuthMode] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -49,18 +50,21 @@ const OnboardingScreen = ({ navigation }) => {
       label: 'Super Admin',
       abbreviation: 'SA',
       description: 'Manage hotels, venues & managers',
+      color: '#ff8c42', // Web primary orange
     },
     {
       id: 'hotel_manager',
       label: 'Hotel Manager',
       abbreviation: 'HM',
       description: 'Manage daily restaurant operations',
+      color: '#00d800', // Web manager green
     },
     {
       id: 'cashier',
       label: 'Cashier',
       abbreviation: 'CA',
       description: 'Manage cash payments and bill generation',
+      color: '#00d8cd', // Web cashier teal
     },
   ];
 
@@ -106,7 +110,7 @@ const OnboardingScreen = ({ navigation }) => {
       let roleParam = 'HOTEL_ADMIN';
       if (selectedRole === 'super_admin') roleParam = 'SUPER_ADMIN';
       else if (selectedRole === 'cashier') roleParam = 'CASHIER';
-      
+
       setLoading(true);
       try {
         await login(formData.email, formData.password, roleParam);
@@ -155,30 +159,53 @@ const OnboardingScreen = ({ navigation }) => {
     return (
       <ImageBackground source={RestaurantBG} style={styles.container} resizeMode="cover">
         <View style={styles.overlay}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.topBannerContainer}>
             <Image source={UdupiBanner} style={styles.bannerImage} resizeMode="contain" />
-            <Image source={DataudipiTitle} style={styles.titleImage} resizeMode="contain" />
-            <Text style={styles.subtitle}>Restaurant Management System</Text>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.heroTitleBlock}>
+              <Image source={DataudipiTitle} style={styles.titleImage} resizeMode="contain" />
+              <Text style={styles.subtitle}>Restaurant Management System</Text>
+            </View>
 
             <Text style={styles.title}>Choose Your Role</Text>
 
             <View style={styles.roleOptions}>
-              {roles.map((role) => (
-                <TouchableOpacity
-                  key={role.id}
-                  style={[styles.roleButton, selectedRole === role.id && styles.activeRoleButton]}
-                  onPress={() => handleRoleSelect(role.id)}
-                >
-                  <View style={styles.iconContainer}><Text style={styles.iconText}>{role.abbreviation}</Text></View>
-                  <View style={styles.roleContent}>
-                    <Text style={styles.roleLabel}>{role.label}</Text>
-                    <Text style={styles.roleDesc}>{role.description}</Text>
-                  </View>
-                  <ChevronRight color="#6b7280" size={24} />
-                </TouchableOpacity>
-              ))}
+              {roles.map((role) => {
+                const isActive = selectedRole === role.id || hoveredRole === role.id;
+                return (
+                  <TouchableOpacity
+                    key={role.id}
+                    dataSet={{ hover: 'card' }}
+                    style={[
+                      styles.roleButton,
+                      isActive && { borderColor: role.color }
+                    ]}
+                    onPress={() => handleRoleSelect(role.id)}
+                    onMouseEnter={() => setHoveredRole(role.id)}
+                    onMouseLeave={() => setHoveredRole(null)}
+                  >
+                    <View style={[
+                      styles.iconContainer,
+                      { backgroundColor: isActive ? role.color : '#303030' }
+                    ]}>
+                      <Text style={styles.iconText}>{role.abbreviation}</Text>
+                    </View>
+                    <View style={styles.roleContent}>
+                      <Text style={styles.roleLabel}>{role.label}</Text>
+                      <Text style={styles.roleDesc}>{role.description}</Text>
+                    </View>
+                    <ChevronRight color={isActive ? role.color : "#6b7280"} size={24} />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
+
+          <View style={styles.bottomBannerContainer}>
+            <Image source={ChefMascot} style={styles.mascotImage} resizeMode="contain" />
+          </View>
         </View>
       </ImageBackground>
     );
@@ -187,11 +214,19 @@ const OnboardingScreen = ({ navigation }) => {
   return (
     <ImageBackground source={RestaurantBG} style={styles.container} resizeMode="cover">
       <View style={styles.overlay}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.topBannerContainer}>
           <Image source={UdupiBanner} style={styles.bannerImage} resizeMode="contain" />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.heroTitleBlock}>
+            <Image source={DataudipiTitle} style={styles.titleImage} resizeMode="contain" />
+            <Text style={styles.subtitle}>Restaurant Management System</Text>
+          </View>
+
           <View style={styles.formContainer}>
             <Text style={styles.authTitle}>
-              {selectedRole === 'super_admin' ? 'Super Admin Account' : selectedRole === 'cashier' ? 'Cashier Account' : 'Hotel Manager Account'}
+              {selectedRole === 'super_admin' ? '👤 Super Admin Account' : selectedRole === 'cashier' ? '💵 Cashier Account' : '🍽️ Hotel Manager Account'}
             </Text>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -199,66 +234,102 @@ const OnboardingScreen = ({ navigation }) => {
 
             {selectedRole !== 'hotel_manager' && (
               <View style={styles.tabsContainer}>
-                <TouchableOpacity onPress={() => setAuthMode('login')} style={[styles.tab, authMode === 'login' && styles.activeTab]}>
+                <TouchableOpacity onPress={() => setAuthMode('login')} style={[styles.tab, authMode === 'login' && styles.activeTab]} dataSet={{ hover: 'nav' }}>
                   <Text style={[styles.tabText, authMode === 'login' && styles.activeTabText]}>Sign In</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setAuthMode('signup')} style={[styles.tab, authMode === 'signup' && styles.activeTab]}>
+                <TouchableOpacity onPress={() => setAuthMode('signup')} style={[styles.tab, authMode === 'signup' && styles.activeTab]} dataSet={{ hover: 'nav' }}>
                   <Text style={[styles.tabText, authMode === 'signup' && styles.activeTabText]}>Sign Up</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {authMode === 'signup' && (
-              <TextInput style={styles.input} placeholder="Full Name" value={formData.name} onChangeText={(text) => handleFormChange('name', text)} />
-            )}
-
-            <TextInput style={styles.input} placeholder="Email Address" keyboardType="email-address" autoCapitalize="none" value={formData.email} onChangeText={(text) => handleFormChange('email', text)} />
-
-            {authMode === 'signup' && (selectedRole === 'hotel_manager' || selectedRole === 'cashier') && (
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.restaurant_id}
-                  onValueChange={(itemValue) => handleFormChange('restaurant_id', itemValue)}
-                  enabled={!restaurantLoading}
-                >
-                  <Picker.Item label="Select a restaurant" value="" />
-                  {restaurants.map(r => <Picker.Item key={r.id} label={r.name} value={r.id} />)}
-                </Picker>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>FULL NAME</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your full name"
+                  placeholderTextColor="#6b7280"
+                  value={formData.name}
+                  onChangeText={(text) => handleFormChange('name', text)}
+                />
               </View>
             )}
 
-            <View style={styles.passwordContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
               <TextInput
-                style={styles.passwordInput}
-                placeholder="Password"
-                secureTextEntry={!showPassword}
-                value={formData.password}
-                onChangeText={(text) => handleFormChange('password', text)}
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor="#6b7280"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={formData.email}
+                onChangeText={(text) => handleFormChange('email', text)}
               />
-              <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOff color="gray" size={20} /> : <Eye color="gray" size={20} />}
-              </TouchableOpacity>
+            </View>
+
+            {authMode === 'signup' && (selectedRole === 'hotel_manager' || selectedRole === 'cashier') && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>RESTAURANT</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.restaurant_id}
+                    onValueChange={(itemValue) => handleFormChange('restaurant_id', itemValue)}
+                    enabled={!restaurantLoading}
+                    style={styles.pickerStyle}
+                  >
+                    <Picker.Item label="Select a restaurant" value="" color="#6b7280" />
+                    {restaurants.map(r => <Picker.Item key={r.id} label={r.name} value={r.id} color="#ffffff" />)}
+                  </Picker>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>PASSWORD</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#6b7280"
+                  secureTextEntry={!showPassword}
+                  value={formData.password}
+                  onChangeText={(text) => handleFormChange('password', text)}
+                />
+                <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff color="#6b7280" size={20} /> : <Eye color="#6b7280" size={20} />}
+                </TouchableOpacity>
+              </View>
             </View>
 
             {authMode === 'signup' && (
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm Password"
-                secureTextEntry={!showPassword}
-                value={formData.confirmPassword}
-                onChangeText={(text) => handleFormChange('confirmPassword', text)}
-              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm your password"
+                  placeholderTextColor="#6b7280"
+                  secureTextEntry={!showPassword}
+                  value={formData.confirmPassword}
+                  onChangeText={(text) => handleFormChange('confirmPassword', text)}
+                />
+              </View>
             )}
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleAuthSubmit} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{authMode === 'login' ? 'Sign In' : 'Create Account'}</Text>}
+            <TouchableOpacity style={styles.submitBtn} onPress={handleAuthSubmit} disabled={loading} dataSet={{ hover: 'btn' }}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{authMode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.backBtn} onPress={() => setStep('role')}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => setStep('role')} dataSet={{ hover: 'nav' }}>
               <Text style={styles.backBtnText}>← Back to Role Selection</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <View style={styles.bottomBannerContainer}>
+          <Image source={ChefMascot} style={styles.mascotImage} resizeMode="contain" />
+        </View>
       </View>
     </ImageBackground>
   );
@@ -266,38 +337,63 @@ const OnboardingScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, width: '100%', height: '100%' },
-  overlay: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.85)' },
-  scrollContent: { alignItems: 'center', padding: 20 },
-  bannerImage: { width: 250, height: 80, marginTop: 40 },
-  titleImage: { width: 200, height: 60, marginTop: 20 },
-  subtitle: { fontSize: 16, color: '#4b5563', marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 20 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.55)' },
+  topBannerContainer: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', zIndex: 11 },
+  bannerImage: { width: 380, height: 160 },
+  bottomBannerContainer: { position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center', zIndex: 11, pointerEvents: 'none' },
+  mascotImage: { width: 500, height: 200 },
+  scrollContent: { alignItems: 'center', justifyContent: 'center', minHeight: '100%', paddingVertical: 120 },
+  heroTitleBlock: { alignItems: 'center', marginBottom: 30 },
+  titleImage: { width: 360, height: 80, marginBottom: 10 },
+  subtitle: { fontSize: 14, color: 'rgb(202, 202, 223)', letterSpacing: 2, textTransform: 'uppercase' },
+  title: { fontSize: 28, fontWeight: '300', color: '#ffffff', marginBottom: 30, letterSpacing: 1 },
   roleOptions: { width: '100%', maxWidth: 500 },
-  roleButton: { flexDirection: 'row', backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', cursor: 'pointer' },
-  activeRoleButton: { borderColor: '#3b82f6', backgroundColor: '#eff6ff' },
-  iconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  iconText: { fontSize: 16, fontWeight: 'bold' },
+  roleButton: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(22, 22, 22, 0.7)',
+    padding: 24,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#404040',
+    cursor: 'pointer'
+  },
+  iconContainer: { width: 60, height: 60, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 20 },
+  iconText: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   roleContent: { flex: 1 },
-  roleLabel: { fontSize: 16, fontWeight: 'bold' },
-  roleDesc: { fontSize: 12, color: 'gray' },
-  formContainer: { width: '100%', maxWidth: 500, backgroundColor: '#fff', padding: 20, borderRadius: 12, elevation: 3, marginTop: 20 },
-  authTitle: { textAlign: 'center', fontSize: 18, color: '#ff8c42', fontWeight: 'bold', marginBottom: 20 },
-  errorText: { color: 'red', marginBottom: 10, textAlign: 'center' },
-  successText: { color: 'green', marginBottom: 10, textAlign: 'center' },
-  tabsContainer: { flexDirection: 'row', marginBottom: 20 },
-  tab: { flex: 1, padding: 10, alignItems: 'center', borderBottomWidth: 2, borderColor: 'transparent', cursor: 'pointer' },
-  activeTab: { borderColor: '#3b82f6' },
-  tabText: { color: 'gray', fontWeight: 'bold' },
-  activeTabText: { color: '#3b82f6' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 15, outlineStyle: 'none' },
-  pickerContainer: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginBottom: 15 },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginBottom: 15 },
-  passwordInput: { flex: 1, padding: 12, outlineStyle: 'none' },
+  roleLabel: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
+  roleDesc: { fontSize: 13, color: '#9ca3af' },
+  formContainer: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(42, 42, 42, 0.7)',
+    padding: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#404040',
+    ...(typeof document !== 'undefined' ? { backdropFilter: 'blur(10px)' } : {})
+  },
+  authTitle: { textAlign: 'center', fontSize: 14, color: '#ff8c42', fontWeight: 'bold', marginBottom: 30, backgroundColor: 'rgba(255, 140, 66, 0.1)', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 140, 66, 0.3)' },
+  errorText: { color: '#ff6b6b', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 6, marginBottom: 20, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
+  successText: { color: '#2d7a4a', backgroundColor: 'rgba(45, 122, 74, 0.1)', padding: 12, borderRadius: 6, marginBottom: 20, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(45, 122, 74, 0.3)' },
+  tabsContainer: { flexDirection: 'row', marginBottom: 30, borderBottomWidth: 1, borderColor: '#404040' },
+  tab: { flex: 1, padding: 12, alignItems: 'center', borderBottomWidth: 2, borderColor: 'transparent', cursor: 'pointer' },
+  activeTab: { borderColor: '#ff8c42' },
+  tabText: { color: '#9ca3af', fontWeight: 'bold', fontSize: 14 },
+  activeTabText: { color: '#ff8c42' },
+  inputGroup: { marginBottom: 20 },
+  inputLabel: { fontSize: 14, color: '#9ca3af', fontWeight: '500', marginBottom: 8, letterSpacing: 0.5 },
+  input: { borderWidth: 1, borderColor: '#404040', backgroundColor: 'rgba(15, 15, 15, 0.5)', borderRadius: 6, padding: 12, color: '#ffffff', outlineStyle: 'none' },
+  pickerContainer: { borderWidth: 1, borderColor: '#404040', backgroundColor: 'rgba(15, 15, 15, 0.5)', borderRadius: 6 },
+  pickerStyle: { color: '#fff', backgroundColor: 'transparent', outlineStyle: 'none', border: 'none', padding: 12 },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#404040', backgroundColor: 'rgba(15, 15, 15, 0.5)', borderRadius: 6 },
+  passwordInput: { flex: 1, padding: 12, outlineStyle: 'none', color: '#ffffff' },
   eyeIcon: { padding: 10, cursor: 'pointer' },
-  submitBtn: { backgroundColor: '#3b82f6', padding: 15, borderRadius: 8, alignItems: 'center', cursor: 'pointer' },
-  submitBtnText: { color: '#fff', fontWeight: 'bold' },
-  backBtn: { marginTop: 15, padding: 10, alignItems: 'center', cursor: 'pointer' },
-  backBtnText: { color: 'gray' }
+  submitBtn: { backgroundColor: '#ff8c42', padding: 15, borderRadius: 6, alignItems: 'center', cursor: 'pointer', marginTop: 10 },
+  submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14, letterSpacing: 1 },
+  backBtn: { marginTop: 16, padding: 12, alignItems: 'center', cursor: 'pointer', borderWidth: 1, borderColor: '#404040', borderRadius: 6 },
+  backBtnText: { color: '#9ca3af', fontSize: 13 }
 });
 
 export default OnboardingScreen;
