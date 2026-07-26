@@ -46,37 +46,39 @@ const VoiceWidget = ({ onNavigate }) => {
 
   useEffect(() => {
     // Setup Voice for Native
-    Voice.onSpeechStart = () => {
-      setIsListening(true);
-      setLiveText('Listening...');
-    };
-    
-    Voice.onSpeechEnd = () => {
-      setIsListening(false);
-    };
-
-    Voice.onSpeechPartialResults = (e) => {
-      if (e.value && e.value.length > 0) {
-        setLiveText(e.value[0]);
-      }
-    };
-    
-    Voice.onSpeechResults = (e) => {
-      if (e.value && e.value.length > 0) {
-        const text = e.value[0];
-        setLiveText('');
+    if (Platform.OS !== 'web') {
+      Voice.onSpeechStart = () => {
+        setIsListening(true);
+        setLiveText('Listening...');
+      };
+      
+      Voice.onSpeechEnd = () => {
         setIsListening(false);
-        handleUserVoiceInput(text, true); // send as voice transcribed
-      }
-    };
+      };
 
-    Voice.onSpeechError = (e) => {
-      if (e.error?.message !== '7/No match') { // Ignore silent errors
-        console.error('Speech error', e);
-      }
-      setIsListening(false);
-      setLiveText('');
-    };
+      Voice.onSpeechPartialResults = (e) => {
+        if (e.value && e.value.length > 0) {
+          setLiveText(e.value[0]);
+        }
+      };
+      
+      Voice.onSpeechResults = (e) => {
+        if (e.value && e.value.length > 0) {
+          const text = e.value[0];
+          setLiveText('');
+          setIsListening(false);
+          handleUserVoiceInput(text, true); // send as voice transcribed
+        }
+      };
+
+      Voice.onSpeechError = (e) => {
+        if (e.error?.message !== '7/No match') { // Ignore silent errors
+          console.error('Speech error', e);
+        }
+        setIsListening(false);
+        setLiveText('');
+      };
+    }
 
     // Setup Audio
     Audio.setAudioModeAsync({
@@ -85,7 +87,9 @@ const VoiceWidget = ({ onNavigate }) => {
     });
 
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
+      if (Platform.OS !== 'web') {
+        Voice.destroy().then(Voice.removeAllListeners);
+      }
       if (soundRef.current) {
         soundRef.current.unloadAsync();
       }
@@ -159,9 +163,9 @@ const VoiceWidget = ({ onNavigate }) => {
 
       if (response.data.audio_payload && !isSpeakerMuted) {
         await playAudioBase64(response.data.audio_payload);
-      } else if (isVoiceMode && isExpanded && !isSpeakerMuted) {
+      } else if (isVoiceModeRef.current && !isSpeakerMuted) {
          // Auto-resume if in voice mode and no audio returned
-         // startListening(); // Optional: can be annoying if it auto-starts always without audio playing
+         startListening();
       }
 
       if (response.data.tool_name === 'navigate_to_page' && response.data.tool_result && onNavigate) {
@@ -192,7 +196,7 @@ const VoiceWidget = ({ onNavigate }) => {
       
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
-          if (isExpanded && isVoiceMode) {
+          if (isVoiceModeRef.current) {
              startListening();
           }
         }
@@ -201,7 +205,7 @@ const VoiceWidget = ({ onNavigate }) => {
       await sound.playAsync();
     } catch (error) {
       console.error("Audio playback failed:", error);
-      if (isExpanded && isVoiceMode) startListening();
+      if (isVoiceModeRef.current) startListening();
     }
   };
 
@@ -302,16 +306,20 @@ const VoiceWidget = ({ onNavigate }) => {
     }
   };
 
-  const stopListening = async () => {
+  const stopListening = async (abort = false) => {
     try {
       if (Platform.OS === 'web') {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-          shouldSendAudioRef.current = true;
+          shouldSendAudioRef.current = !abort;
           mediaRecorderRef.current.stop();
         }
         return;
       }
-      await Voice.stop();
+      if (abort) {
+        await Voice.cancel();
+      } else {
+        await Voice.stop();
+      }
     } catch (e) {
       console.error("Stop listening error", e);
     }
@@ -320,7 +328,7 @@ const VoiceWidget = ({ onNavigate }) => {
   const toggleVoiceMode = () => {
     if (isVoiceMode) {
       setIsVoiceMode(false);
-      if (isListening) stopListening();
+      if (isListening) stopListening(true);
     } else {
       setIsVoiceMode(true);
       startListening();
