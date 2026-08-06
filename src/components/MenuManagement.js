@@ -9,6 +9,7 @@ export default function MenuManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedRegion, setSelectedRegion] = useState('All');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -83,7 +84,8 @@ export default function MenuManagement() {
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'All' || item.category_id === categories.find(c => c.name === activeCategory)?.id;
-    return matchesSearch && matchesCategory;
+    const matchesRegion = selectedRegion === 'All' || categories.find(c => c.id === item.category_id)?.description === selectedRegion;
+    return matchesSearch && matchesCategory && matchesRegion;
   });
 
   const availableCount = items.filter(i => i.is_available).length;
@@ -116,7 +118,22 @@ export default function MenuManagement() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={{ paddingRight: 20 }}>
-        {['All', ...categories.map(c => c.name)].map(cat => (
+        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'All' && styles.activeCatBtn]} onPress={() => setSelectedRegion('All')}>
+          <Text style={[styles.catText, selectedRegion === 'All' && styles.activeCatText]}>All Regions</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'South Indian' && styles.activeCatBtn]} onPress={() => setSelectedRegion('South Indian')}>
+          <Text style={[styles.catText, selectedRegion === 'South Indian' && styles.activeCatText]}>South Indian</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'North Indian' && styles.activeCatBtn]} onPress={() => setSelectedRegion('North Indian')}>
+          <Text style={[styles.catText, selectedRegion === 'North Indian' && styles.activeCatText]}>North Indian</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={{ paddingRight: 20 }}>
+        {['All', ...categories
+          .filter(c => (selectedRegion === 'All' || c.description === selectedRegion) && items.some(item => item.category_id === c.id))
+          .map(c => c.name)]
+          .map(cat => (
           <TouchableOpacity key={cat} style={[styles.catBtn, activeCategory === cat && styles.activeCatBtn]} onPress={() => setActiveCategory(cat)}>
             <Text style={[styles.catText, activeCategory === cat && styles.activeCatText]}>{cat}</Text>
           </TouchableOpacity>
@@ -216,7 +233,26 @@ export default function MenuManagement() {
                 <Text style={styles.label}>IMAGE URL (OPTIONAL)</Text>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="https://example.com/image.jpg" value={newItem.image_url} onChangeText={t => setNewItem({...newItem, image_url: t})} />
-                  <TouchableOpacity style={styles.uploadBtn}><Text style={styles.uploadBtnText}>Upload Image</Text></TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.uploadBtn}
+                    onPress={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          try {
+                            const res = await menuService.uploadImage(file);
+                            if (res.image_url) setNewItem({...newItem, image_url: res.image_url});
+                          } catch(err) { alert("Upload failed"); }
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Text style={styles.uploadBtnText}>Upload Image</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </ScrollView>

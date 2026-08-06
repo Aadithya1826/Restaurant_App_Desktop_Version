@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, Dimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { menuService } from '../services/api';
 import api from '../services/api';
@@ -17,6 +17,7 @@ export default function CashierDashboard({ navigation }) {
   const [cart, setCart] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('All');
+  const [selectedRegion, setSelectedRegion] = useState('All');
   const [productCodeInput, setProductCodeInput] = useState('');
   const [descriptionInput, setDescriptionInput] = useState('');
   
@@ -54,6 +55,25 @@ export default function CashierDashboard({ navigation }) {
       .catch(err => console.error(err));
   }, [user]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        // Only trigger if focus is not in an input, OR if we want it to trigger anyway.
+        // Actually, if they are in the search input, onSubmitEditing handles it.
+        // But if they are just focused on the body, this handles it.
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          if (cart.length > 0 && !showInvoice && !showFutureSaleModal) {
+            handleCheckout();
+          }
+        }
+      }
+    };
+    if (Platform.OS === 'web') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [cart, showInvoice, showFutureSaleModal, orderType, paymentMethod, futureSale]);
+
   const addItemToCart = (item) => {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
@@ -80,6 +100,10 @@ export default function CashierDashboard({ navigation }) {
         setProductCodeInput('');
       } else {
         Alert.alert("Not Found", "Item code not found");
+      }
+    } else {
+      if (cart.length > 0) {
+        handleCheckout();
       }
     }
   };
@@ -112,6 +136,9 @@ export default function CashierDashboard({ navigation }) {
     setLastFutureSale({ ...futureSale });
     setFutureSale({ name: '', address: '', city: '', phone: '', deliveryDate: '' });
     setShowInvoice(true);
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
   const handleLogout = async () => {
@@ -121,6 +148,10 @@ export default function CashierDashboard({ navigation }) {
 
   const filteredItems = menuItems.filter(item => {
     if (selectedCategoryId !== 'All' && item.category_id !== selectedCategoryId) return false;
+    if (selectedRegion !== 'All') {
+      const categoryObj = categories.find(c => c.id === item.category_id);
+      if (!categoryObj || categoryObj.description !== selectedRegion) return false;
+    }
     const search = descriptionInput.trim().toLowerCase();
     if (search) {
       const matchName = item.name && item.name.toLowerCase().includes(search);
@@ -192,10 +223,24 @@ export default function CashierDashboard({ navigation }) {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
+            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'All' && styles.catBtnActive]} onPress={() => setSelectedRegion('All')} dataSet={{ hover: 'btn' }}>
+              <Text style={[styles.catText, selectedRegion === 'All' && styles.catTextActive]}>All Regions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'South Indian' && styles.catBtnActive]} onPress={() => setSelectedRegion('South Indian')} dataSet={{ hover: 'btn' }}>
+              <Text style={[styles.catText, selectedRegion === 'South Indian' && styles.catTextActive]}>South Indian</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'North Indian' && styles.catBtnActive]} onPress={() => setSelectedRegion('North Indian')} dataSet={{ hover: 'btn' }}>
+              <Text style={[styles.catText, selectedRegion === 'North Indian' && styles.catTextActive]}>North Indian</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
             <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')} dataSet={{ hover: 'btn' }}>
               <Text style={[styles.catText, selectedCategoryId === 'All' && styles.catTextActive]}>All</Text>
             </TouchableOpacity>
-            {categories.map(cat => (
+            {categories
+              .filter(cat => (selectedRegion === 'All' || cat.description === selectedRegion) && menuItems.some(item => item.category_id === cat.id))
+              .map(cat => (
               <TouchableOpacity key={cat.id} style={[styles.catBtn, selectedCategoryId === cat.id && styles.catBtnActive]} onPress={() => setSelectedCategoryId(cat.id)} dataSet={{ hover: 'btn' }}>
                 <Text style={[styles.catText, selectedCategoryId === cat.id && styles.catTextActive]}>{cat.name}</Text>
               </TouchableOpacity>
