@@ -282,12 +282,28 @@ export const inventoryService = {
   },
 
   scanInventory: async (formData) => {
-    const response = await api.post('/api/v1/inventory/scan', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/api/v1/inventory/scan`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error('Scan failed');
+        error.response = { data };
+        throw error;
+      }
+      return data;
+    } catch (e) {
+      if (e.response) throw e;
+      const error = new Error('Network error during scan');
+      error.response = { data: { detail: e.message } };
+      throw error;
+    }
   },
 
   bulkUpdateInventory: async (items) => {
@@ -326,6 +342,23 @@ export const managerService = {
 export const reportsService = {
   getReports: async (params = {}) => {
     const response = await api.get('/api/v1/reports', { params });
+    return response.data;
+  },
+  getConsumptionReport: async (date) => {
+    const response = await api.get('/api/v1/reports/consumption', { params: { report_date: date } });
+    return response.data;
+  },
+};
+
+export const recipeService = {
+  getRecipes: async (menuItemId = null) => {
+    const params = menuItemId ? { menu_item_id: menuItemId } : {};
+    const response = await api.get('/api/v1/recipes', { params });
+    return response.data;
+  },
+
+  updateRecipe: async (payload) => {
+    const response = await api.post('/api/v1/recipes', payload);
     return response.data;
   },
 };
