@@ -1,8 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { cacheData, getCachedData, queueAction } from './offlineSync';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://dev-api.dataudipi.com';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,10 +15,14 @@ const api = axios.create({
 
 export function rewriteImageUrl(url) {
   if (!url) return url;
-  if (url.startsWith('/')) {
-    return `${API_BASE_URL}${url}`;
+  
+  // Remove any explicit localhost references to prevent hardcoded dev URLs
+  let cleanUrl = url.replace(/^https?:\/\/localhost(:\d+)?/, '');
+  
+  if (cleanUrl.startsWith('/')) {
+    return `${API_BASE_URL.replace(/\/$/, '')}${cleanUrl}`;
   }
-  return url;
+  return cleanUrl;
 }
 
 api.interceptors.request.use(async (config) => {
@@ -46,12 +51,33 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Cache GET requests successfully fetched from server
+    if (response.config.method === 'get') {
+      cacheData(response.config.url, response.data);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
     if (originalRequest.url === '/api/v1/auth/refresh') {
       return Promise.reject(error);
+    }
+
+    // Handle Network Errors (Offline Mode)
+    if (!error.response || error.code === 'ERR_NETWORK') {
+      if (originalRequest.method === 'get') {
+        const cachedData = await getCachedData(originalRequest.url);
+        if (cachedData) {
+          console.log(`[Offline API] Served from cache: ${originalRequest.url}`);
+          return Promise.resolve({ data: cachedData, _offline: true });
+        }
+      } else if (['post', 'patch', 'put', 'delete'].includes(originalRequest.method)) {
+        console.log(`[Offline API] Queued mutation: ${originalRequest.url}`);
+        await queueAction(originalRequest.url, originalRequest.method, JSON.parse(originalRequest.data || '{}'));
+        return Promise.resolve({ data: { success: true, _offline: true } });
+      }
     }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
