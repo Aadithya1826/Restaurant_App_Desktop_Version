@@ -471,6 +471,7 @@ export default function InventoryManagement({ setActiveTab }) {
                       <Text style={styles.th}>Open</Text>
                       <Text style={styles.th}>Purchase</Text>
                       <Text style={styles.th}>Issue</Text>
+                      <Text style={styles.th}>Balance</Text>
                       <Text style={styles.th}>Unit</Text>
                     </View>
                     
@@ -519,6 +520,18 @@ export default function InventoryManagement({ setActiveTab }) {
                             onChangeText={t => {
                               const newRes = [...scanResults];
                               newRes[idx].issue = parseFloat(t) || 0;
+                              setScanResults(newRes);
+                            }} 
+                          />
+                        </View>
+                        <View style={styles.td}>
+                          <TextInput 
+                            style={styles.scanInput} 
+                            keyboardType="numeric" 
+                            value={String(item.balance || 0)} 
+                            onChangeText={t => {
+                              const newRes = [...scanResults];
+                              newRes[idx].balance = parseFloat(t) || 0;
                               setScanResults(newRes);
                             }} 
                           />
