@@ -844,24 +844,62 @@ export default function AdminDashboard({ navigation }) {
         <Modal visible={showEditManager} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Manager</Text>
-              <Text style={styles.modalSubtitle}>Update details for {editingManager.name}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={styles.modalTitle}>Edit Manager</Text>
+                <TouchableOpacity onPress={() => { setShowEditManager(false); setEditingManager(null); }}>
+                  <X color="#6b7280" size={20} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>Update details for {editingManager.name}.</Text>
+              
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name</Text>
+                <Text style={styles.inputLabel}>Manager Name</Text>
                 <TextInput style={styles.input} placeholder="Enter full name" value={editingManager.name} onChangeText={t => setEditingManager({ ...editingManager, name: t })} />
               </View>
+              
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Email Address</Text>
+                <Text style={styles.inputLabel}>Email</Text>
                 <TextInput style={styles.input} placeholder="Enter email" value={editingManager.email} onChangeText={t => setEditingManager({ ...editingManager, email: t })} />
               </View>
+              
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Restaurant ID</Text>
-                <TextInput style={styles.input} placeholder="Enter restaurant ID" keyboardType="numeric" value={editingManager.restaurant_id?.toString() || ''} onChangeText={t => setEditingManager({ ...editingManager, restaurant_id: parseInt(t) || null })} />
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput style={styles.input} placeholder="Enter new password (leave blank to keep current)" secureTextEntry value={editingManager.password || ''} onChangeText={t => setEditingManager({ ...editingManager, password: t })} />
               </View>
-              <View style={styles.modalActions}>
-                <TouchableOpacity onPress={() => { setShowEditManager(false); setEditingManager(null); }} style={styles.cancelBtn}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
-                <TouchableOpacity onPress={updateManager} style={styles.saveBtn}><Text style={styles.saveBtnText}>Save Changes</Text></TouchableOpacity>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Hotel Assignment</Text>
+                <View style={[styles.input, { padding: 0, justifyContent: 'center', overflow: 'hidden' }]}>
+                  <Picker 
+                    selectedValue={editingManager.restaurant_id} 
+                    onValueChange={(itemValue) => setEditingManager({ ...editingManager, restaurant_id: itemValue })}
+                    style={{ width: '100%', height: '100%', backgroundColor: 'transparent', borderWidth: 0, outlineStyle: 'none', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111' }}
+                  >
+                    <Picker.Item label="Select Hotel" value="" color="#9ca3af" />
+                    {hotels.map(h => <Picker.Item key={h.id} label={h.name + (h.address ? ` — ${h.address}` : '')} value={h.id} color="#111" />)}
+                  </Picker>
+                </View>
               </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, marginTop: 8 }}>
+                <TouchableOpacity 
+                  style={{ width: 18, height: 18, borderRadius: 4, backgroundColor: editingManager.is_active !== false ? '#3b82f6' : '#e5e7eb', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                  onPress={() => setEditingManager({ ...editingManager, is_active: editingManager.is_active === false })}
+                >
+                  {editingManager.is_active !== false && <Check color="white" size={14} />}
+                </TouchableOpacity>
+                <Text style={{ fontSize: 14, color: '#6b7280' }}>Active Status</Text>
+              </View>
+
+              <View style={{ alignItems: 'flex-end', marginBottom: 16 }}>
+                <TouchableOpacity onPress={() => { setShowEditManager(false); setEditingManager(null); }} style={{ backgroundColor: '#f3f4f6', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 }}>
+                  <Text style={{ fontWeight: 'bold', color: '#111', fontSize: 14 }}>CANCEL</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity onPress={updateManager} style={{ backgroundColor: '#f97316', paddingVertical: 14, borderRadius: 8, alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', color: 'white', fontSize: 14 }}>SAVE CHANGES</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
