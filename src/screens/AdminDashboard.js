@@ -3,10 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, Tex
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { restaurantService, managerService, tableService, reportsService } from '../services/api';
+import { backupData } from '../services/offlineSync';
 import {
   LogOut, LayoutDashboard, Building2, Users, Settings,
   Menu, X, Trash2, Pencil, BarChart3, Users2, DollarSign,
-  MapPin, AlertCircle, ChevronRight, TrendingUp, CreditCard
+  MapPin, AlertCircle, ChevronRight, TrendingUp, CreditCard, Check
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -85,6 +86,11 @@ export default function AdminDashboard({ navigation }) {
       setManagers(Array.isArray(m) ? m : []);
       setTables(Array.isArray(t) ? t : []);
       setReports(r);
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      if (h && h.length > 0) backupData('SuperAdmin', 'Hotels', `Hotels_List_${dateStr}.json`, h);
+      if (m && m.length > 0) backupData('SuperAdmin', 'Managers', `Managers_List_${dateStr}.json`, m);
+      if (r && Object.keys(r).length > 0) backupData('SuperAdmin', 'Reports', `Platform_Summary_${dateStr}.json`, r);
     } catch (e) {
       console.error(e);
     } finally {

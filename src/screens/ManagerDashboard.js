@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter, Image } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { orderService, tableService, reportsService } from '../services/api';
+import { backupData } from '../services/offlineSync';
 import { 
   LogOut, LayoutDashboard, UtensilsCrossed, ShoppingCart, 
   Table2, Package, Settings, Menu, X, Check, Flame, 
@@ -50,6 +51,11 @@ export default function HotelManagerDashboard({ navigation }) {
       setTables(Array.isArray(t) ? t : []);
       const r = await reportsService.getReports().catch(() => null);
       if (r) setReports(r.data || r);
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      if (o && o.length > 0) backupData('Manager', 'Orders', `Live_Orders_${dateStr}.json`, o);
+      if (t && t.length > 0) backupData('Manager', 'Tables', `Tables_Status_${dateStr}.json`, t);
+      if (r) backupData('Manager', 'Reports', `Daily_Summary_${dateStr}.json`, r.data || r);
     } catch (e) {
       console.error(e);
     }

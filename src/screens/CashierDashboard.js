@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleShe
 import { useAuth } from '../context/AuthContext';
 import { menuService } from '../services/api';
 import api from '../services/api';
+import { backupData } from '../services/offlineSync';
 import { LogOut, Trash2 } from 'lucide-react-native';
 import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
@@ -20,13 +21,13 @@ export default function CashierDashboard({ navigation }) {
   const [selectedRegion, setSelectedRegion] = useState('All');
   const [productCodeInput, setProductCodeInput] = useState('');
   const [descriptionInput, setDescriptionInput] = useState('');
-  
+
   const [billNo, setBillNo] = useState(101);
   const [lastBillNo, setLastBillNo] = useState(0);
   const [lastBillAmt, setLastBillAmt] = useState(0);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showFutureSaleModal, setShowFutureSaleModal] = useState(false);
-  
+
   const [orderType, setOrderType] = useState('take-away');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [futureSale, setFutureSale] = useState({ name: '', address: '', city: '', phone: '', deliveryDate: '' });
@@ -122,6 +123,9 @@ export default function CashierDashboard({ navigation }) {
       total_amount: totalAmt
     };
 
+    const dateStr = new Date().toISOString().split('T')[0];
+    backupData('Cashier', 'Receipts', `Receipt_${billNo}_${dateStr}.json`, payload);
+
     api.post(`/api/v1/orders?restaurant_id=${user?.restaurant_id}`, payload)
       .then(res => Alert.alert("Success", "Order placed successfully"))
       .catch(err => Alert.alert("Error", "Failed to place order"));
@@ -148,10 +152,6 @@ export default function CashierDashboard({ navigation }) {
 
   const filteredItems = menuItems.filter(item => {
     if (selectedCategoryId !== 'All' && item.category_id !== selectedCategoryId) return false;
-    if (selectedRegion !== 'All') {
-      const categoryObj = categories.find(c => c.id === item.category_id);
-      if (!categoryObj || categoryObj.description !== selectedRegion) return false;
-    }
     const search = descriptionInput.trim().toLowerCase();
     if (search) {
       const matchName = item.name && item.name.toLowerCase().includes(search);
@@ -181,15 +181,15 @@ export default function CashierDashboard({ navigation }) {
             <Text style={styles.headerSubtitle}>Counter POS - Cashier</Text>
           </View>
         </View>
-        
+
         <View style={styles.headerCenter}>
           <Text style={styles.billNo}>Bill No: {billNo}</Text>
         </View>
-        
+
         <View style={styles.headerRight}>
           <Text style={styles.headerDate}>{new Date().toLocaleDateString()} - Items in cart: {cart.length}</Text>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <LogOut size={16} color="#ef4444" style={{marginRight: 6}} />
+            <LogOut size={16} color="#ef4444" style={{ marginRight: 6 }} />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -199,7 +199,7 @@ export default function CashierDashboard({ navigation }) {
       <View style={[styles.mainLayout, { flexDirection: isTablet ? 'row' : 'column' }]}>
         {/* Left Panel */}
         <View style={[styles.leftPanel, { flex: isTablet ? 7 : 1 }]}>
-          
+
           <View style={styles.inputStack}>
             <View style={styles.pickerWrapper}>
               <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker}>
@@ -222,17 +222,22 @@ export default function CashierDashboard({ navigation }) {
             />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
-            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'All' && styles.catBtnActive]} onPress={() => setSelectedRegion('All')} dataSet={{ hover: 'btn' }}>
-              <Text style={[styles.catText, selectedRegion === 'All' && styles.catTextActive]}>All Regions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'South Indian' && styles.catBtnActive]} onPress={() => setSelectedRegion('South Indian')} dataSet={{ hover: 'btn' }}>
-              <Text style={[styles.catText, selectedRegion === 'South Indian' && styles.catTextActive]}>South Indian</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.catBtn, selectedRegion === 'North Indian' && styles.catBtnActive]} onPress={() => setSelectedRegion('North Indian')} dataSet={{ hover: 'btn' }}>
-              <Text style={[styles.catText, selectedRegion === 'North Indian' && styles.catTextActive]}>North Indian</Text>
-            </TouchableOpacity>
-          </ScrollView>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, marginBottom: 4, gap: 12 }}>
+            {['All Regions', 'South Indian', 'North Indian'].map(region => {
+              const val = region === 'All Regions' ? 'All' : region;
+              return (
+                <TouchableOpacity 
+                  key={region}
+                  style={[styles.regionBtn, selectedRegion === val && styles.regionBtnActive]}
+                  onPress={() => setSelectedRegion(val)}
+                >
+                  <Text style={[styles.regionText, selectedRegion === val && styles.regionTextActive]}>
+                    {region}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
             <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')} dataSet={{ hover: 'btn' }}>
@@ -283,8 +288,8 @@ export default function CashierDashboard({ navigation }) {
               <Text style={styles.clearText}>Clear</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.cartSubtitle}>{cart.length} lines · {cart.reduce((a,b)=>a+b.qty,0)} items</Text>
-          
+          <Text style={styles.cartSubtitle}>{cart.length} lines · {cart.reduce((a, b) => a + b.qty, 0)} items</Text>
+
           <FlatList
             data={cart}
             keyExtractor={item => item.id.toString()}
@@ -349,22 +354,26 @@ const styles = StyleSheet.create({
   headerDate: { fontSize: 13, color: '#6b7280', marginRight: 16 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, cursor: 'pointer' },
   logoutText: { color: '#ef4444', fontWeight: '500', fontSize: 13 },
-  
+
   mainLayout: { flex: 1, flexDirection: 'row', minHeight: 0 },
   leftPanel: { flex: 7, backgroundColor: '#ffffff', paddingHorizontal: 32, paddingTop: 24, paddingBottom: 0, borderRightWidth: 1, borderColor: '#e5e7eb', minHeight: 0 },
-  
+
   inputStack: { gap: 16, marginBottom: 24 },
   pickerWrapper: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, backgroundColor: '#fff', height: 48, justifyContent: 'center', width: '30%' },
   picker: { height: 48, borderWidth: 0, outlineStyle: 'none', backgroundColor: 'transparent', paddingHorizontal: 16 },
   searchInput: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 16, fontSize: 14, backgroundColor: '#fff', outlineStyle: 'none' },
-  
-  categoryScroll: { flexGrow: 0, marginBottom: 16, maxHeight: 40 },
-  categoryContainer: { gap: 12, paddingBottom: 8 },
-  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff', cursor: 'pointer', height: 36, justifyContent: 'center' },
+
+  categoryScroll: { flexGrow: 0, marginTop: 8, marginBottom: 16 },
+  categoryContainer: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
+  regionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  regionBtnActive: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
+  regionText: { color: '#64748b', fontSize: 13, fontWeight: '600' },
+  regionTextActive: { color: 'white' },
+  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: {width:0, height:1}, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   catBtnActive: { backgroundColor: '#f3f4f6', borderColor: '#d1d5db' },
   catText: { fontSize: 13, color: '#111827', fontWeight: '500' },
   catTextActive: { fontWeight: '600' },
-  
+
   tableContainer: { flex: 1, borderTopWidth: 1, borderColor: '#e5e7eb', minHeight: 0 },
   tableHeader: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
   thText: { fontSize: 11, fontWeight: '600', color: '#6b7280', letterSpacing: 0.5 },
@@ -374,13 +383,13 @@ const styles = StyleSheet.create({
   tdPrice: { fontSize: 14, color: '#6b7280', marginRight: 16 },
   addSquareBtn: { width: 32, height: 32, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', cursor: 'pointer' },
   addSquareText: { fontSize: 18, color: '#111827', marginTop: -2 },
-  
+
   rightPanel: { flex: 3, backgroundColor: '#ffffff', flexDirection: 'column', minHeight: 0 },
   cartHeaderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 32 },
   cartHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
   clearText: { fontSize: 13, color: '#6b7280', cursor: 'pointer' },
   cartSubtitle: { fontSize: 13, color: '#6b7280', paddingHorizontal: 24, marginTop: 4, marginBottom: 24 },
-  
+
   cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderColor: '#f3f4f6' },
   cartRowName: { fontSize: 14, fontWeight: '500', color: '#111827', marginBottom: 4 },
   cartRowRate: { fontSize: 14, color: '#6b7280' },
@@ -388,7 +397,7 @@ const styles = StyleSheet.create({
   cartQtyBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   cartQtyText: { fontSize: 14, fontWeight: '500', minWidth: 20, textAlign: 'center' },
   cartRowTotal: { fontSize: 13, color: '#6b7280', width: 60, textAlign: 'right' },
-  
+
   cartFooterArea: { padding: 24, borderTopWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
   futureSaleLightBtn: { backgroundColor: '#f3f4f6', paddingVertical: 12, borderRadius: 6, alignItems: 'center', marginBottom: 24, cursor: 'pointer' },
   futureSaleLightText: { fontSize: 13, fontWeight: '500', color: '#374151' },
