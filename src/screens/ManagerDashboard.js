@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter, Image } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { orderService, tableService } from '../services/api';
+import { orderService, tableService, reportsService } from '../services/api';
 import { 
   LogOut, LayoutDashboard, UtensilsCrossed, ShoppingCart, 
   Table2, Package, Settings, Menu, X, Check, Flame, 
@@ -14,6 +14,7 @@ import InventoryManagement from '../components/InventoryManagement';
 import PaymentsManagement from '../components/PaymentsManagement';
 import ReportsManagement from '../components/ReportsManagement';
 import SettingsManagement from '../components/SettingsManagement';
+import ConsumptionReports from '../components/ConsumptionReports';
 import { Wallet } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -25,9 +26,11 @@ export default function HotelManagerDashboard({ navigation }) {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(isTablet);
+  const [hoverLogout, setHoverLogout] = useState(false);
 
   const [orders, setOrders] = useState([]);
   const [tables, setTables] = useState([]);
+  const [reports, setReports] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -45,6 +48,8 @@ export default function HotelManagerDashboard({ navigation }) {
       setOrders(Array.isArray(o) ? o : []);
       const t = await tableService.getTables();
       setTables(Array.isArray(t) ? t : []);
+      const r = await reportsService.getReports().catch(() => null);
+      if (r) setReports(r.data || r);
     } catch (e) {
       console.error(e);
     }
@@ -65,18 +70,18 @@ export default function HotelManagerDashboard({ navigation }) {
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <View style={[styles.iconWrapper, { backgroundColor: '#ff8c42' }]}><ShoppingCart color="white" size={16} /></View>
-            <View style={styles.trendBadge}><Text style={styles.trendText}>+100.0%</Text></View>
+            <View style={styles.trendBadge}><Text style={styles.trendText}>{reports?.summary?.today_orders?.change || '+0.0%'}</Text></View>
           </View>
-          <Text style={styles.statValue}>{orders.length}</Text>
+          <Text style={styles.statValue}>{reports?.summary?.today_orders?.value || 0}</Text>
           <Text style={styles.statLabel}>Total Orders Today</Text>
         </View>
 
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <View style={[styles.iconWrapper, { backgroundColor: '#2d7a4a' }]}><TrendingUp color="white" size={16} /></View>
-            <View style={styles.trendBadge}><Text style={styles.trendText}>+100.0%</Text></View>
+            <View style={styles.trendBadge}><Text style={styles.trendText}>{reports?.summary?.today_revenue?.change || '+0.0%'}</Text></View>
           </View>
-          <Text style={styles.statValue}>₹{Math.round(orders.reduce((acc, o) => acc + (parseFloat(o.total_amount) || 0), 0))}</Text>
+          <Text style={styles.statValue}>₹{Math.round(reports?.summary?.today_revenue?.value || 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>Revenue Today</Text>
         </View>
 
@@ -101,11 +106,7 @@ export default function HotelManagerDashboard({ navigation }) {
 
       {/* Best Sellers */}
       <View style={styles.bestSellerContainer}>
-        {[
-          { name: 'Parcel Meals', orders: 100 },
-          { name: 'Tomato Salad', orders: 36 },
-          { name: 'Cucumber Salad', orders: 33 }
-        ].map((item, i) => (
+        {(reports?.top_items || []).slice(0, 3).map((item, i) => (
           <View key={i} style={styles.bestSellerCard}>
             <View style={styles.bestSellerIcon}>
               <Flame color="white" size={20} />
@@ -117,6 +118,9 @@ export default function HotelManagerDashboard({ navigation }) {
             </View>
           </View>
         ))}
+        {(!reports?.top_items || reports.top_items.length === 0) && (
+          <Text style={{color: '#9ca3af', padding: 20}}>No items sold yet.</Text>
+        )}
       </View>
 
       {/* Recent Orders */}
@@ -166,7 +170,7 @@ export default function HotelManagerDashboard({ navigation }) {
           <View style={[styles.sidebar, !isTablet && styles.mobileSidebar]}>
             <View style={styles.sidebarHeader}>
               <View style={styles.logoContainer}>
-                <img src={DataudipiTitle} alt="Data Udipi" style={styles.logoImage} />
+                <Image source={DataudipiTitle} style={styles.logoImage} resizeMode="contain" />
                 <View style={styles.managerBadge}><Text style={styles.managerBadgeText}>MANAGER</Text></View>
               </View>
               {!isTablet && <TouchableOpacity onPress={() => setSidebarOpen(false)}><X color="white" /></TouchableOpacity>}
@@ -218,9 +222,14 @@ export default function HotelManagerDashboard({ navigation }) {
 
             <View style={styles.sidebarFooter}>
               <Text style={styles.poweredByText}>Powered by Data Udipi</Text>
-              <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                <LogOut color="#9ca3af" size={16} style={{ marginRight: 8 }} />
-                <Text style={styles.navText}>Logout</Text>
+              <TouchableOpacity 
+                style={[styles.logoutBtn, hoverLogout && styles.logoutBtnHover]} 
+                onPress={handleLogout}
+                onMouseEnter={() => setHoverLogout(true)}
+                onMouseLeave={() => setHoverLogout(false)}
+              >
+                <LogOut color={hoverLogout ? "#ff8c42" : "#9ca3af"} size={16} style={{ marginRight: 8 }} />
+                <Text style={[styles.navText, hoverLogout && { color: '#ff8c42' }]}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -253,7 +262,8 @@ export default function HotelManagerDashboard({ navigation }) {
             {activeTab === 'menu' && <MenuManagement />}
             {activeTab === 'orders' && <OrdersManagement />}
             {activeTab === 'tables' && <TableManagement />}
-            {activeTab === 'inventory' && <InventoryManagement />}
+            {activeTab === 'inventory' && <InventoryManagement setActiveTab={setActiveTab} />}
+            {activeTab === 'consumption' && <ConsumptionReports />}
             {activeTab === 'payments' && <PaymentsManagement />}
             {activeTab === 'reports' && <ReportsManagement />}
             {activeTab === 'settings' && <SettingsManagement />}
@@ -273,7 +283,7 @@ const styles = StyleSheet.create({
   mobileSidebar: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 50 },
   sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 30, alignItems: 'center' },
   logoContainer: { flexDirection: 'row', alignItems: 'center' },
-  logoImage: { width: 120, height: 30, marginRight: 8 },
+  logoImage: { width: 120, height: 26, marginRight: 8 },
   managerBadge: { borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 },
   managerBadgeText: { color: '#10b981', fontSize: 10, fontWeight: 'bold' },
   navContainer: { flex: 1 },
@@ -283,7 +293,8 @@ const styles = StyleSheet.create({
   activeNavText: { color: '#ff8c42', fontWeight: 'bold' },
   sidebarFooter: { padding: 20, borderTopWidth: 1, borderColor: '#1f2937' },
   poweredByText: { color: '#6b7280', fontSize: 11, marginBottom: 16 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', cursor: 'pointer' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', cursor: 'pointer', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: 'transparent' },
+  logoutBtnHover: { borderColor: '#ff8c42', backgroundColor: 'rgba(255, 140, 66, 0.05)' },
   
   // Main Content
   mainContent: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden', minHeight: 0 },

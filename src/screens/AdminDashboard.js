@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform, DeviceEventEmitter, Animated, Easing } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { restaurantService, managerService, tableService, reportsService } from '../services/api';
 import {
@@ -22,6 +23,7 @@ export default function AdminDashboard({ navigation }) {
   const [managers, setManagers] = useState([]);
   const [tables, setTables] = useState([]);
   const [reports, setReports] = useState(null);
+  const [hoverLogout, setHoverLogout] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -37,6 +39,29 @@ export default function AdminDashboard({ navigation }) {
   const [showEditManager, setShowEditManager] = useState(false);
   const [editingManager, setEditingManager] = useState(null);
 
+  // Settings State
+  const [darkMode, setDarkMode] = useState(false);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [autoAssignManagers, setAutoAssignManagers] = useState(false);
+  const [twoFactorAuth, setTwoFactorAuth] = useState(false);
+  const [dailyBackups, setDailyBackups] = useState(true);
+  const [sessionTimeout, setSessionTimeout] = useState('30 mins');
+  const [backupFrequency, setBackupFrequency] = useState('Daily at Midnight');
+
+  // Chart Animation State
+  const [chartAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      chartAnim.setValue(0);
+      Animated.timing(chartAnim, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [activeTab, chartAnim]);
   useEffect(() => {
     fetchData();
     const navSub = DeviceEventEmitter.addListener('navigate_tab', (data) => {
@@ -45,7 +70,7 @@ export default function AdminDashboard({ navigation }) {
       }
     });
     return () => navSub.remove();
-  }, [activeTab]);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -434,15 +459,23 @@ export default function AdminDashboard({ navigation }) {
           </View>
 
           <View style={{ height: 160, marginTop: 20 }}>
-            <View style={{ flexDirection: 'row', height: 12, paddingHorizontal: 24 }}>
-              {['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map((month) => (
-                <View key={month} style={{ flex: 1, marginHorizontal: 2, backgroundColor: '#fcd0b3', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} />
+            <View style={{ flexDirection: 'row', height: 120, paddingHorizontal: 24, alignItems: 'flex-end' }}>
+              {(reports?.chart_data || []).map((data, i) => (
+                <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+                  <Animated.View style={{ 
+                    width: '60%', 
+                    height: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [0, (data.revenue / Math.max(...(reports?.chart_data || []).map(d=>d.revenue), 1)) * 120] }),
+                    backgroundColor: '#f97316', 
+                    borderTopLeftRadius: 6, 
+                    borderTopRightRadius: 6 
+                  }} />
+                </View>
               ))}
             </View>
-            <View style={{ flex: 1, backgroundColor: '#fef3ec', borderBottomWidth: 1, borderColor: '#fcd0b3' }} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 40, paddingVertical: 12 }}>
-              {['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map(month => (
-                <Text key={month} style={{ fontSize: 12, color: '#6b7280', width: 40, textAlign: 'center' }}>{month}</Text>
+            <View style={{ flex: 1, borderTopWidth: 1, borderColor: '#fcd0b3' }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 12, marginTop: -20 }}>
+              {(reports?.chart_data || []).map((data, i) => (
+                <Text key={i} style={{ flex: 1, fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{data.name}</Text>
               ))}
             </View>
           </View>
@@ -454,24 +487,26 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.reportsCardSubtitle}>Share</Text>
           </View>
 
-          {[
-            { name: 'Razorpay', share: '53.4%', color: '#f97316', width: '53.4%' },
-            { name: 'Cash', share: '38.9%', color: '#2f6d46', width: '38.9%' },
-            { name: 'UPI', share: '6.0%', color: '#ff7b72', width: '6.0%' },
-            { name: 'Cash', share: '0.8%', color: '#6b7280', width: '0.8%' },
-            { name: 'Wallet', share: '0.7%', color: '#f97316', width: '0.7%' },
-            { name: 'Card', share: '0.2%', color: '#2f6d46', width: '0.2%' }
-          ].map((item, idx) => (
+          {reports?.payment_methods?.map((item, idx) => {
+            const colors = ['#f97316', '#2f6d46', '#ff7b72', '#6b7280', '#0284c7'];
+            const maxVal = Math.max(...reports.payment_methods.map(p=>p.value), 1);
+            const sharePct = ((item.value / maxVal) * 100).toFixed(1);
+            return (
             <View key={idx} style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: '#111' }}>{item.name}</Text>
-                <Text style={{ fontSize: 12, color: '#6b7280' }}>{item.share}</Text>
+                <Text style={{ fontSize: 12, color: '#6b7280' }}>{sharePct}%</Text>
               </View>
               <View style={{ height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
-                <View style={{ width: item.width, height: '100%', backgroundColor: item.color }} />
+                <Animated.View style={{ 
+                  width: chartAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${sharePct}%`] }), 
+                  height: '100%', 
+                  backgroundColor: colors[idx % colors.length] 
+                }} />
               </View>
             </View>
-          ))}
+          )})}
+          {(!reports?.payment_methods || reports.payment_methods.length === 0) && <Text style={{color: '#9ca3af', textAlign: 'center'}}>No data available.</Text>}
         </View>
 
         {/* Hotel Performance */}
@@ -492,18 +527,21 @@ export default function AdminDashboard({ navigation }) {
             <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'right' }]}>Performance</Text>
           </View>
 
-          <View style={styles.perfTableRow}>
-            <Text style={[styles.perfRowTextBold, { flex: 2 }]}>Data Udipi</Text>
-            <Text style={[styles.perfRowTextBold, { flex: 1, textAlign: 'center' }]}>₹40,419.05</Text>
-            <Text style={[styles.perfRowText, { flex: 1, textAlign: 'center' }]}>197</Text>
-            <Text style={[styles.perfRowTextBold, { flex: 1, color: '#16a34a', textAlign: 'center' }]}>+12%</Text>
-            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
-              <View style={styles.perfProgressBarBg}>
-                <View style={styles.perfProgressBarFill} />
-                <View style={styles.perfProgressDot} />
+          {(reports?.top_hotels || []).map((h, i) => (
+            <View key={i} style={styles.perfTableRow}>
+              <Text style={[styles.perfRowTextBold, { flex: 2 }]}>{h.name}</Text>
+              <Text style={[styles.perfRowTextBold, { flex: 1, textAlign: 'center' }]}>₹{h.revenue?.toLocaleString() || 0}</Text>
+              <Text style={[styles.perfRowText, { flex: 1, textAlign: 'center' }]}>{h.orders}</Text>
+              <Text style={[styles.perfRowTextBold, { flex: 1, color: '#16a34a', textAlign: 'center' }]}>{h.growth || '+0%'}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <View style={styles.perfProgressBarBg}>
+                  <View style={[styles.perfProgressBarFill, { width: `${(h.revenue / Math.max(...reports.top_hotels.map(t=>t.revenue), 1)) * 100}%` }]} />
+                  <View style={[styles.perfProgressDot, { left: `${(h.revenue / Math.max(...reports.top_hotels.map(t=>t.revenue), 1)) * 100}%` }]} />
+                </View>
               </View>
             </View>
-          </View>
+          ))}
+          {(!reports?.top_hotels || reports.top_hotels.length === 0) && <Text style={{color: '#9ca3af', textAlign: 'center', padding: 20}}>No data available.</Text>}
         </View>
       </ScrollView>
     );
@@ -548,7 +586,9 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.settingsRowTitle}>Dark Mode</Text>
             <Text style={styles.settingsRowDesc}>Enable dark theme across the platform</Text>
           </View>
-          <View style={styles.toggleTrack}><View style={styles.toggleThumb} /></View>
+          <TouchableOpacity onPress={() => setDarkMode(!darkMode)} style={darkMode ? styles.toggleTrackActive : styles.toggleTrack}>
+            <View style={darkMode ? styles.toggleThumbActive : styles.toggleThumb} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.settingsRow}>
@@ -556,7 +596,9 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.settingsRowTitle}>Push Notifications</Text>
             <Text style={styles.settingsRowDesc}>Receive alerts for critical updates</Text>
           </View>
-          <View style={styles.toggleTrackActive}><View style={styles.toggleThumbActive} /></View>
+          <TouchableOpacity onPress={() => setPushNotifications(!pushNotifications)} style={pushNotifications ? styles.toggleTrackActive : styles.toggleTrack}>
+            <View style={pushNotifications ? styles.toggleThumbActive : styles.toggleThumb} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
@@ -564,7 +606,9 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.settingsRowTitle}>Auto-assign Managers</Text>
             <Text style={styles.settingsRowDesc}>Automatically link new venues</Text>
           </View>
-          <View style={styles.toggleTrack}><View style={styles.toggleThumb} /></View>
+          <TouchableOpacity onPress={() => setAutoAssignManagers(!autoAssignManagers)} style={autoAssignManagers ? styles.toggleTrackActive : styles.toggleTrack}>
+            <View style={autoAssignManagers ? styles.toggleThumbActive : styles.toggleThumb} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -579,14 +623,19 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.settingsRowTitle}>Two-Factor Authentication</Text>
             <Text style={styles.settingsRowDesc}>Require 2FA for all admin logins</Text>
           </View>
-          <View style={styles.toggleTrack}><View style={styles.toggleThumb} /></View>
+          <TouchableOpacity onPress={() => setTwoFactorAuth(!twoFactorAuth)} style={twoFactorAuth ? styles.toggleTrackActive : styles.toggleTrack}>
+            <View style={twoFactorAuth ? styles.toggleThumbActive : styles.toggleThumb} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
           <Text style={styles.settingsFieldLabel}>SESSION TIMEOUT</Text>
-          <View style={styles.settingsSelectBox}>
-            <Text style={styles.settingsSelectText}>30 mins</Text>
-            <Text style={{ fontSize: 10, color: '#111' }}>▼</Text>
+          <View style={[styles.settingsSelectBox, { padding: 0 }]}>
+            <Picker selectedValue={sessionTimeout} onValueChange={(v) => setSessionTimeout(v)} style={{ width: '100%', height: '100%', backgroundColor: 'transparent', borderWidth: 0, outlineStyle: 'none' }}>
+              <Picker.Item label="15 mins" value="15 mins" />
+              <Picker.Item label="30 mins" value="30 mins" />
+              <Picker.Item label="1 hour" value="1 hour" />
+            </Picker>
           </View>
         </View>
       </View>
@@ -602,14 +651,19 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.settingsRowTitle}>Daily Backups</Text>
             <Text style={styles.settingsRowDesc}>Schedule automatic database backups</Text>
           </View>
-          <View style={styles.toggleTrackActive}><View style={styles.toggleThumbActive} /></View>
+          <TouchableOpacity onPress={() => setDailyBackups(!dailyBackups)} style={dailyBackups ? styles.toggleTrackActive : styles.toggleTrack}>
+            <View style={dailyBackups ? styles.toggleThumbActive : styles.toggleThumb} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
           <Text style={styles.settingsFieldLabel}>BACKUP FREQUENCY</Text>
-          <View style={styles.settingsSelectBox}>
-            <Text style={styles.settingsSelectText}>Daily at Midnight</Text>
-            <Text style={{ fontSize: 10, color: '#111' }}>▼</Text>
+          <View style={[styles.settingsSelectBox, { padding: 0 }]}>
+            <Picker selectedValue={backupFrequency} onValueChange={(v) => setBackupFrequency(v)} style={{ width: '100%', height: '100%', backgroundColor: 'transparent', borderWidth: 0, outlineStyle: 'none' }}>
+              <Picker.Item label="Daily at Midnight" value="Daily at Midnight" />
+              <Picker.Item label="Weekly on Sundays" value="Weekly on Sundays" />
+              <Picker.Item label="Every 12 Hours" value="Every 12 Hours" />
+            </Picker>
           </View>
         </View>
 
@@ -619,27 +673,6 @@ export default function AdminDashboard({ navigation }) {
       </View>
     </ScrollView>
   );
-
-  const getPageTitle = () => {
-    switch (activeTab) {
-      case 'dashboard': return 'Dashboard';
-      case 'hotels': return 'Hotels & Venues';
-      case 'managers': return 'Managers';
-      case 'reports': return 'Reports & Analytics';
-      case 'settings': return 'Settings';
-      default: return 'Admin Panel';
-    }
-  };
-
-  const getPageSubtitle = () => {
-    switch (activeTab) {
-      case 'dashboard': return 'Platform-wide overview';
-      case 'hotels': return `${hotels.length} Hotels Registered`;
-      case 'managers': return 'Hotel managers & assignments';
-      case 'reports': return 'Platform-wide performance insights';
-      default: return '';
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -680,9 +713,14 @@ export default function AdminDashboard({ navigation }) {
 
             <View style={styles.sidebarFooter}>
               <Text style={styles.poweredByText}>Powered by Data Udipi</Text>
-              <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                <LogOut color="#9ca3af" size={18} />
-                <Text style={styles.logoutText}>Logout</Text>
+              <TouchableOpacity 
+                style={[styles.logoutBtn, hoverLogout && styles.logoutBtnHover]} 
+                onPress={handleLogout}
+                onMouseEnter={() => setHoverLogout(true)}
+                onMouseLeave={() => setHoverLogout(false)}
+              >
+                <LogOut color={hoverLogout ? "#ff8c42" : "#9ca3af"} size={18} />
+                <Text style={[styles.logoutText, hoverLogout && { color: '#ff8c42' }]}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -852,8 +890,9 @@ const styles = StyleSheet.create({
   activeNavText: { color: '#ff8c42', fontWeight: 'bold' },
   sidebarFooter: { padding: 20, borderTopWidth: 1, borderColor: '#1f2937' },
   poweredByText: { color: '#6b7280', fontSize: 11, marginBottom: 16 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', cursor: 'pointer' },
-  logoutText: { color: '#9ca3af', marginLeft: 12, fontSize: 14, fontWeight: '500' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', cursor: 'pointer', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: 'transparent' },
+  logoutBtnHover: { borderColor: '#ff8c42', backgroundColor: 'rgba(255, 140, 66, 0.05)' },
+  logoutText: { color: '#9ca3af', fontWeight: '500', marginLeft: 8 },
 
   // Main Content Styles
   mainContent: { flex: 1, backgroundColor: '#f8fafc', minHeight: 0 },

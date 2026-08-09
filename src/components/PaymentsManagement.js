@@ -22,31 +22,19 @@ export default function PaymentsManagement() {
     }
   };
 
-  // Mock data calculations for UI if orders are empty/limited
-  const totalCollection = orders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 39559.05;
-  const upiPayments = orders.filter(o => o.payment_method === 'UPI').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 2411.2;
-  const cardPayments = orders.filter(o => o.payment_method === 'Card').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 73.8;
-  const cashPayments = orders.filter(o => o.payment_method === 'Cash').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 15177.7;
+  const totalCollection = orders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+  const upiPayments = orders.filter(o => o.payment_method === 'UPI').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+  const cardPayments = orders.filter(o => o.payment_method === 'Card').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+  const cashPayments = orders.filter(o => o.payment_method === 'Cash').reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
 
-  const mockTransactions = [
-    { id: '#2319', table: 'Takeaway', amount: 65, method: 'Cash', time: '1 hour ago', status: 'Pending' },
-    { id: '#2318', table: 'Takeaway', amount: 65, method: 'Cash', time: '23 hours ago', status: 'Pending' },
-    { id: '#2317', table: 'Takeaway', amount: 1, method: 'Cash', time: '23 hours ago', status: 'Pending' },
-    { id: '#2316', table: 'Takeaway', amount: 1, method: 'Razorpay', time: '23 hours ago', status: 'Paid' },
-    { id: '#2315', table: 'Takeaway', amount: 1, method: 'Razorpay', time: '23 hours ago', status: 'Paid' },
-    { id: '#2314', table: 'Takeaway', amount: 65, method: 'Razorpay', time: '1 day ago', status: 'Paid' },
-    { id: '#2313', table: 'Takeaway', amount: 1, method: 'Cash', time: '1 day ago', status: 'Pending' },
-    { id: '#2312', table: 'Takeaway', amount: 1, method: 'Cash', time: '1 day ago', status: 'Pending' },
-  ];
-
-  const displayTransactions = orders.length > 5 ? orders.map(o => ({
+  const displayTransactions = orders.map(o => ({
     id: `#${o.order_id}`,
     table: !o.table_number || o.table_number.toString().toLowerCase() === 'takeaway' || o.table_number === 'N/A' ? 'Takeaway' : `Dine-In T-${o.table_number}`,
     amount: o.total_amount,
     method: o.payment_method || 'Cash',
     time: new Date(o.created_at).toLocaleDateString(),
     status: o.payment_status === 'PAID' ? 'Paid' : 'Pending'
-  })) : mockTransactions;
+  }));
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
