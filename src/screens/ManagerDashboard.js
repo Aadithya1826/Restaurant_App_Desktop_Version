@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter, Image } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { orderService, tableService, reportsService } from '../services/api';
 import { backupData } from '../services/offlineSync';
 import { 
@@ -27,6 +28,7 @@ export default function HotelManagerDashboard({ navigation }) {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(isTablet);
+  const { t, language } = useLanguage();
   const [hoverLogout, setHoverLogout] = useState(false);
 
   const [orders, setOrders] = useState([]);
@@ -79,7 +81,7 @@ export default function HotelManagerDashboard({ navigation }) {
             <View style={styles.trendBadge}><Text style={styles.trendText}>{reports?.summary?.today_orders?.change || '+0.0%'}</Text></View>
           </View>
           <Text style={styles.statValue}>{reports?.summary?.today_orders?.value || 0}</Text>
-          <Text style={styles.statLabel}>Total Orders Today</Text>
+          <Text style={styles.statLabel}>{t('today_orders')}</Text>
         </View>
 
         <View style={styles.statCard}>
@@ -88,7 +90,7 @@ export default function HotelManagerDashboard({ navigation }) {
             <View style={styles.trendBadge}><Text style={styles.trendText}>{reports?.summary?.today_revenue?.change || '+0.0%'}</Text></View>
           </View>
           <Text style={styles.statValue}>₹{Math.round(reports?.summary?.today_revenue?.value || 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Revenue Today</Text>
+          <Text style={styles.statLabel}>{t('today_revenue')}</Text>
         </View>
 
         <View style={styles.statCard}>
@@ -106,7 +108,7 @@ export default function HotelManagerDashboard({ navigation }) {
             <View style={styles.trendBadge}><Text style={styles.trendText}>+63%</Text></View>
           </View>
           <Text style={styles.statValue}>{tables.filter(t => t.is_active).length}/{tables.length || 19}</Text>
-          <Text style={styles.statLabel}>Active Tables</Text>
+          <Text style={styles.statLabel}>{t('active_tables')}</Text>
         </View>
       </View>
 
@@ -186,7 +188,7 @@ export default function HotelManagerDashboard({ navigation }) {
               <ScrollView showsVerticalScrollIndicator={false}>
               <TouchableOpacity style={[styles.navItem, activeTab === 'dashboard' && styles.activeNav]} onPress={() => { setActiveTab('dashboard'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <LayoutDashboard color={activeTab === 'dashboard' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'dashboard' && styles.activeNavText]}>Dashboard</Text>
+                <Text style={[styles.navText, activeTab === 'dashboard' && styles.activeNavText]}>{t('nav_dashboard')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={[styles.navItem, activeTab === 'menu' && styles.activeNav]} onPress={() => { setActiveTab('menu'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
@@ -206,7 +208,7 @@ export default function HotelManagerDashboard({ navigation }) {
               
               <TouchableOpacity style={[styles.navItem, activeTab === 'inventory' && styles.activeNav]} onPress={() => { setActiveTab('inventory'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Package color={activeTab === 'inventory' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'inventory' && styles.activeNavText]}>Inventory</Text>
+                <Text style={[styles.navText, activeTab === 'inventory' && styles.activeNavText]}>{t('nav_inventory')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={[styles.navItem, activeTab === 'payments' && styles.activeNav]} onPress={() => { setActiveTab('payments'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
@@ -216,12 +218,12 @@ export default function HotelManagerDashboard({ navigation }) {
 
               <TouchableOpacity style={[styles.navItem, activeTab === 'reports' && styles.activeNav]} onPress={() => { setActiveTab('reports'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <TrendingUp color={activeTab === 'reports' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'reports' && styles.activeNavText]}>Reports</Text>
+                <Text style={[styles.navText, activeTab === 'reports' && styles.activeNavText]}>{t('nav_reports') || 'Reports'}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={[styles.navItem, activeTab === 'settings' && styles.activeNav]} onPress={() => { setActiveTab('settings'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Settings color={activeTab === 'settings' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'settings' && styles.activeNavText]}>Settings</Text>
+                <Text style={[styles.navText, activeTab === 'settings' && styles.activeNavText]}>{t('nav_settings')}</Text>
               </TouchableOpacity>
               </ScrollView>
             </View>

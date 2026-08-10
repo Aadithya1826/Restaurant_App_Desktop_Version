@@ -5,12 +5,15 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import CashierDashboard from './src/screens/CashierDashboard';
 import AdminDashboard from './src/screens/AdminDashboard';
 import ManagerDashboard from './src/screens/ManagerDashboard';
 import VoiceWidget from './src/components/VoiceWidget';
+import OfflineSetupModal from './src/components/OfflineSetupModal';
+import { initOfflineSync } from './src/services/offlineSync';
 
 const Stack = createStackNavigator();
 
@@ -18,11 +21,17 @@ const AppNavigator = () => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigation = useNavigation();
 
+  useEffect(() => {
+    initOfflineSync();
+  }, []);
+
   const handleNavigate = (page, subtab) => {
-    // Notify active dashboards via event emitter
+    // Notify active dashboards via event emitter (handles internal tabs like 'menu', 'orders')
     DeviceEventEmitter.emit('navigate_tab', { page, subtab });
     
-    if (navigation && page) {
+    // Only navigate via React Navigation if it's a known top-level stack screen
+    const topLevelScreens = ['AdminDashboard', 'ManagerDashboard', 'CashierDashboard', 'Login', 'Onboarding'];
+    if (navigation && page && topLevelScreens.includes(page)) {
        navigation.navigate(page, { subtab });
     }
   };
@@ -37,6 +46,7 @@ const AppNavigator = () => {
 
   return (
     <>
+    <OfflineSetupModal />
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
         <>
@@ -59,7 +69,7 @@ const AppNavigator = () => {
         </>
       )}
     </Stack.Navigator>
-    {isAuthenticated && <VoiceWidget onNavigate={handleNavigate} />}
+    {isAuthenticated && user?.role !== 'CASHIER' && <VoiceWidget onNavigate={handleNavigate} />}
     </>
   );
 };
@@ -83,11 +93,13 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

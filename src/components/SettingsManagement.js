@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, TextInput } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { useLanguage } from '../context/LanguageContext';
 import { Store, Clock, Bell, Receipt, CheckCircle } from 'lucide-react-native';
 
 export default function SettingsManagement() {
+  const { t, language, setLanguage } = useLanguage();
   const [settings, setSettings] = useState({
     orderNotifications: true,
     lowStockAlerts: false,
@@ -22,7 +25,7 @@ export default function SettingsManagement() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>System Settings</Text>
+          <Text style={styles.title}>{t('settings_system')}</Text>
           <Text style={styles.subtitle}>Configure your restaurant preferences</Text>
         </View>
         <TouchableOpacity style={styles.saveBtn}>
@@ -33,6 +36,30 @@ export default function SettingsManagement() {
 
       <View style={styles.content}>
         
+        {/* Language Selection */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.iconWrapper, { backgroundColor: '#3b82f6' }]}>
+              <Text style={{ fontSize: 20 }}>🌐</Text>
+            </View>
+            <Text style={styles.cardTitle}>{t('settings_language')}</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{t('settings_language_desc')}</Text>
+          <View style={{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden', maxWidth: 300 }}>
+            <Picker selectedValue={language} onValueChange={(val) => setLanguage(val)} style={{ height: 40, borderWidth: 0, outlineStyle: 'none' }}>
+              <Picker.Item label="English" value="en" />
+              <Picker.Item label="हिन्दी (Hindi)" value="hi" />
+              <Picker.Item label="தமிழ் (Tamil)" value="ta" />
+              <Picker.Item label="తెలుగు (Telugu)" value="te" />
+              <Picker.Item label="ಕನ್ನಡ (Kannada)" value="kn" />
+              <Picker.Item label="മലയാളം (Malayalam)" value="ml" />
+              <Picker.Item label="मराठी (Marathi)" value="mr" />
+              <Picker.Item label="বাংলা (Bengali)" value="bn" />
+              <Picker.Item label="भोजपुरी (Bhojpuri)" value="bho" />
+            </Picker>
+          </View>
+        </View>
+
         {/* Restaurant Information */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>

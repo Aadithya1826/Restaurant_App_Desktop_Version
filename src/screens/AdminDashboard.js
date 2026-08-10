@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform, DeviceEventEmitter, Animated, Easing } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { restaurantService, managerService, tableService, reportsService } from '../services/api';
 import { backupData } from '../services/offlineSync';
 import {
@@ -19,6 +20,7 @@ export default function AdminDashboard({ navigation }) {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(isTablet);
+  const { t, language, setLanguage } = useLanguage();
 
   const [hotels, setHotels] = useState([]);
   const [managers, setManagers] = useState([]);
@@ -183,7 +185,7 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.statTrendText}>Active on platform</Text>
           </View>
           <Text style={styles.statValue}>{hotels.length}</Text>
-          <Text style={styles.statLabel}>Total Hotels</Text>
+          <Text style={styles.statLabel}>{t('total_hotels')}</Text>
         </View>
 
         <View style={styles.statCard}>
@@ -194,7 +196,7 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.statTrendText}>Assigned managers</Text>
           </View>
           <Text style={styles.statValue}>{managers.length}</Text>
-          <Text style={styles.statLabel}>Active Managers</Text>
+          <Text style={styles.statLabel}>{t('active_managers')}</Text>
         </View>
 
         <View style={styles.statCard}>
@@ -558,7 +560,7 @@ export default function AdminDashboard({ navigation }) {
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, marginTop: 10 }}>
         <View>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>System Settings</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>{t('settings_system')}</Text>
           <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>Configure platform-wide preferences</Text>
         </View>
         <TouchableOpacity style={styles.primaryBtnSmall} dataSet={{ hover: 'btn' }}>
@@ -584,13 +586,32 @@ export default function AdminDashboard({ navigation }) {
       <View style={styles.settingsCard} dataSet={{ hover: 'card' }}>
         <View style={styles.settingsHeader}>
           <View style={styles.settingsHeaderIconBg}><Text style={{ fontSize: 16, color: '#f97316' }}>🌐</Text></View>
-          <Text style={styles.settingsHeaderTitle}>General</Text>
+          <Text style={styles.settingsHeaderTitle}>{t('settings_general')}</Text>
         </View>
 
-        <View style={styles.settingsRow}>
+        
+        <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 16, flexDirection: 'column', alignItems: 'flex-start' }]}>
+          <Text style={styles.settingsRowTitle}>{t('settings_language')}</Text>
+          <Text style={styles.settingsRowDesc}>{t('settings_language_desc')}</Text>
+          <View style={[styles.settingsSelectBox, { padding: 0, marginTop: 12, width: '100%', maxWidth: 300 }]}>
+            <Picker selectedValue={language} onValueChange={(val) => setLanguage(val)} style={styles.pickerStyle}>
+              <Picker.Item label="English" value="en" />
+              <Picker.Item label="हिन्दी (Hindi)" value="hi" />
+              <Picker.Item label="தமிழ் (Tamil)" value="ta" />
+              <Picker.Item label="తెలుగు (Telugu)" value="te" />
+              <Picker.Item label="ಕನ್ನಡ (Kannada)" value="kn" />
+              <Picker.Item label="മലയാളം (Malayalam)" value="ml" />
+              <Picker.Item label="मराठी (Marathi)" value="mr" />
+              <Picker.Item label="বাংলা (Bengali)" value="bn" />
+              <Picker.Item label="भोजपुरी (Bhojpuri)" value="bho" />
+            </Picker>
+          </View>
+        </View>
+        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 16 }} />
+<View style={styles.settingsRow}>
           <View>
-            <Text style={styles.settingsRowTitle}>Dark Mode</Text>
-            <Text style={styles.settingsRowDesc}>Enable dark theme across the platform</Text>
+            <Text style={styles.settingsRowTitle}>{t('settings_dark_mode')}</Text>
+            <Text style={styles.settingsRowDesc}>{t('settings_dark_mode_desc')}</Text>
           </View>
           <TouchableOpacity onPress={() => setDarkMode(!darkMode)} style={darkMode ? styles.toggleTrackActive : styles.toggleTrack}>
             <View style={darkMode ? styles.toggleThumbActive : styles.toggleThumb} />
@@ -599,8 +620,8 @@ export default function AdminDashboard({ navigation }) {
 
         <View style={styles.settingsRow}>
           <View>
-            <Text style={styles.settingsRowTitle}>Push Notifications</Text>
-            <Text style={styles.settingsRowDesc}>Receive alerts for critical updates</Text>
+            <Text style={styles.settingsRowTitle}>{t('settings_push_notifications')}</Text>
+            <Text style={styles.settingsRowDesc}>{t('settings_push_notifications_desc')}</Text>
           </View>
           <TouchableOpacity onPress={() => setPushNotifications(!pushNotifications)} style={pushNotifications ? styles.toggleTrackActive : styles.toggleTrack}>
             <View style={pushNotifications ? styles.toggleThumbActive : styles.toggleThumb} />
@@ -621,13 +642,13 @@ export default function AdminDashboard({ navigation }) {
       <View style={styles.settingsCard} dataSet={{ hover: 'card' }}>
         <View style={styles.settingsHeader}>
           <View style={styles.settingsHeaderIconBg}><Text style={{ fontSize: 16, color: '#f97316' }}>🛡️</Text></View>
-          <Text style={styles.settingsHeaderTitle}>Security</Text>
+          <Text style={styles.settingsHeaderTitle}>{t('settings_security')}</Text>
         </View>
 
         <View style={styles.settingsRow}>
           <View>
-            <Text style={styles.settingsRowTitle}>Two-Factor Authentication</Text>
-            <Text style={styles.settingsRowDesc}>Require 2FA for all admin logins</Text>
+            <Text style={styles.settingsRowTitle}>{t('settings_2fa')}</Text>
+            <Text style={styles.settingsRowDesc}>{t('settings_2fa_desc')}</Text>
           </View>
           <TouchableOpacity onPress={() => setTwoFactorAuth(!twoFactorAuth)} style={twoFactorAuth ? styles.toggleTrackActive : styles.toggleTrack}>
             <View style={twoFactorAuth ? styles.toggleThumbActive : styles.toggleThumb} />
@@ -635,7 +656,7 @@ export default function AdminDashboard({ navigation }) {
         </View>
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
-          <Text style={styles.settingsFieldLabel}>SESSION TIMEOUT</Text>
+          <Text style={styles.settingsFieldLabel}>{t('settings_session_timeout')}</Text>
           <View style={[styles.settingsSelectBox, { padding: 0 }]}>
             <Picker selectedValue={sessionTimeout} onValueChange={(v) => setSessionTimeout(v)} style={{ width: '100%', height: '100%', backgroundColor: 'transparent', borderWidth: 0, outlineStyle: 'none' }}>
               <Picker.Item label="15 mins" value="15 mins" />
@@ -649,13 +670,13 @@ export default function AdminDashboard({ navigation }) {
       <View style={styles.settingsCard} dataSet={{ hover: 'card' }}>
         <View style={styles.settingsHeader}>
           <View style={styles.settingsHeaderIconBgDark}><Text style={{ fontSize: 16 }}>🗄️</Text></View>
-          <Text style={styles.settingsHeaderTitle}>Data & Backup</Text>
+          <Text style={styles.settingsHeaderTitle}>{t('settings_data_backup')}</Text>
         </View>
 
         <View style={styles.settingsRow}>
           <View>
-            <Text style={styles.settingsRowTitle}>Daily Backups</Text>
-            <Text style={styles.settingsRowDesc}>Schedule automatic database backups</Text>
+            <Text style={styles.settingsRowTitle}>{t('settings_daily_backups')}</Text>
+            <Text style={styles.settingsRowDesc}>{t('settings_daily_backups_desc')}</Text>
           </View>
           <TouchableOpacity onPress={() => setDailyBackups(!dailyBackups)} style={dailyBackups ? styles.toggleTrackActive : styles.toggleTrack}>
             <View style={dailyBackups ? styles.toggleThumbActive : styles.toggleThumb} />
@@ -663,7 +684,7 @@ export default function AdminDashboard({ navigation }) {
         </View>
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
-          <Text style={styles.settingsFieldLabel}>BACKUP FREQUENCY</Text>
+          <Text style={styles.settingsFieldLabel}>{t('settings_backup_frequency')}</Text>
           <View style={[styles.settingsSelectBox, { padding: 0 }]}>
             <Picker selectedValue={backupFrequency} onValueChange={(v) => setBackupFrequency(v)} style={{ width: '100%', height: '100%', backgroundColor: 'transparent', borderWidth: 0, outlineStyle: 'none' }}>
               <Picker.Item label="Daily at Midnight" value="Daily at Midnight" />
@@ -697,15 +718,15 @@ export default function AdminDashboard({ navigation }) {
             <ScrollView style={styles.navContainer}>
               <TouchableOpacity style={[styles.navItem, activeTab === 'dashboard' && styles.activeNav]} onPress={() => { setActiveTab('dashboard'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <LayoutDashboard color={activeTab === 'dashboard' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'dashboard' && styles.activeNavText]}>Dashboard</Text>
+                <Text style={[styles.navText, activeTab === 'dashboard' && styles.activeNavText]}>{t('nav_dashboard')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'hotels' && styles.activeNav]} onPress={() => { setActiveTab('hotels'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Building2 color={activeTab === 'hotels' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'hotels' && styles.activeNavText]}>Hotels</Text>
+                <Text style={[styles.navText, activeTab === 'hotels' && styles.activeNavText]}>{t('nav_hotels')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'managers' && styles.activeNav]} onPress={() => { setActiveTab('managers'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Users color={activeTab === 'managers' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'managers' && styles.activeNavText]}>Managers</Text>
+                <Text style={[styles.navText, activeTab === 'managers' && styles.activeNavText]}>{t('nav_managers')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'reports' && styles.activeNav]} onPress={() => { setActiveTab('reports'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <BarChart3 color={activeTab === 'reports' ? '#ff8c42' : '#9ca3af'} size={20} />
@@ -713,7 +734,7 @@ export default function AdminDashboard({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'settings' && styles.activeNav]} onPress={() => { setActiveTab('settings'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Settings color={activeTab === 'settings' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'settings' && styles.activeNavText]}>Settings</Text>
+                <Text style={[styles.navText, activeTab === 'settings' && styles.activeNavText]}>{t('nav_settings')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
