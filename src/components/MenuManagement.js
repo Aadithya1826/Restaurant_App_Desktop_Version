@@ -66,7 +66,7 @@ export default function MenuManagement() {
   };
 
   const handleDelete = (id) => {
-    if(window.confirm && window.confirm("Are you sure?")) {
+    if (window.confirm && window.confirm("Are you sure?")) {
       try {
         menuService.deleteItem(id).then(() => {
           setItems(items.filter(i => i.id !== id));
@@ -82,17 +82,21 @@ export default function MenuManagement() {
   };
 
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const search = searchQuery.toLowerCase().trim();
+    const matchesSearch = search === '' || 
+                          item.name?.toLowerCase().includes(search) ||
+                          item.id?.toString().includes(search) ||
+                          item.item_code?.toString().toLowerCase().includes(search) ||
+                          item.product_code?.toString().toLowerCase().includes(search);
     const matchesCategory = activeCategory === 'All' || item.category_id === categories.find(c => c.name === activeCategory)?.id;
-    const matchesRegion = selectedRegion === 'All' || categories.find(c => c.id === item.category_id)?.description === selectedRegion;
-    return matchesSearch && matchesCategory && matchesRegion;
+    return matchesSearch && matchesCategory;
   });
 
   const availableCount = items.filter(i => i.is_available).length;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -108,32 +112,34 @@ export default function MenuManagement() {
       {/* Search and Filters */}
       <View style={styles.searchContainer}>
         <Search color="#94a3b8" size={20} style={{ marginLeft: 16 }} />
-        <TextInput 
-          style={styles.searchInput} 
-          placeholder="Search menu item" 
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search menu item"
           placeholderTextColor="#94a3b8"
-          value={searchQuery} 
-          onChangeText={setSearchQuery} 
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={{ paddingRight: 20 }}>
-        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'All' && styles.activeCatBtn]} onPress={() => setSelectedRegion('All')}>
-          <Text style={[styles.catText, selectedRegion === 'All' && styles.activeCatText]}>All Regions</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'South Indian' && styles.activeCatBtn]} onPress={() => setSelectedRegion('South Indian')}>
-          <Text style={[styles.catText, selectedRegion === 'South Indian' && styles.activeCatText]}>South Indian</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.catBtn, selectedRegion === 'North Indian' && styles.activeCatBtn]} onPress={() => setSelectedRegion('North Indian')}>
-          <Text style={[styles.catText, selectedRegion === 'North Indian' && styles.activeCatText]}>North Indian</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, marginBottom: 4, gap: 12 }}>
+        {['All Regions', 'South Indian', 'North Indian'].map(region => {
+          const val = region === 'All Regions' ? 'All' : region;
+          return (
+            <TouchableOpacity 
+              key={region}
+              style={[styles.regionBtn, selectedRegion === val && styles.regionBtnActive]}
+              onPress={() => setSelectedRegion(val)}
+            >
+              <Text style={[styles.regionText, selectedRegion === val && styles.regionTextActive]}>
+                {region}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={{ paddingRight: 20 }}>
-        {['All', ...categories
-          .filter(c => (selectedRegion === 'All' || c.description === selectedRegion) && items.some(item => item.category_id === c.id))
-          .map(c => c.name)]
-          .map(cat => (
+        {['All', ...categories.filter(cat => (selectedRegion === 'All' || cat.description === selectedRegion) && items.some(item => item.category_id === cat.id)).map(c => c.name)].map(cat => (
           <TouchableOpacity key={cat} style={[styles.catBtn, activeCategory === cat && styles.activeCatBtn]} onPress={() => setActiveCategory(cat)}>
             <Text style={[styles.catText, activeCategory === cat && styles.activeCatText]}>{cat}</Text>
           </TouchableOpacity>
@@ -155,12 +161,12 @@ export default function MenuManagement() {
                   <Text style={styles.priceText}>₹{item.price}</Text>
                 </View>
               </View>
-              
+
               <View style={styles.cardBody}>
                 <Text style={styles.itemId}>ID: {item.id}</Text>
                 <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.itemDesc} numberOfLines={2}>{item.description || 'Crispy golden crepe filled with spiced potato, served with...'}</Text>
-                
+
                 <View style={styles.cardActions}>
                   <View style={styles.availToggleContainer}>
                     <Switch
@@ -204,36 +210,47 @@ export default function MenuManagement() {
             </View>
 
             <ScrollView style={styles.modalScroll}>
+              {editingItem && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>ITEM ID / PRODUCT CODE</Text>
+                  <TextInput 
+                    style={[styles.input, { backgroundColor: '#f1f5f9', color: '#64748b' }]} 
+                    value={editingItem.id?.toString() || editingItem.product_code?.toString() || ''} 
+                    editable={false} 
+                  />
+                </View>
+              )}
+
               <View style={styles.formGroup}>
                 <Text style={styles.label}>ITEM NAME</Text>
-                <TextInput style={styles.input} placeholder="e.g. Masala Dosa" value={newItem.name} onChangeText={t => setNewItem({...newItem, name: t})} />
+                <TextInput style={styles.input} placeholder="e.g. Masala Dosa" value={newItem.name} onChangeText={t => setNewItem({ ...newItem, name: t })} />
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>CATEGORY</Text>
-                <TextInput style={styles.input} placeholder="Category ID" keyboardType="numeric" value={newItem.category_id.toString()} onChangeText={t => setNewItem({...newItem, category_id: t})} />
+                <TextInput style={styles.input} placeholder="Category ID" keyboardType="numeric" value={newItem.category_id.toString()} onChangeText={t => setNewItem({ ...newItem, category_id: t })} />
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>PRICE</Text>
-                <TextInput style={styles.input} placeholder="INR (₹) 0.00" keyboardType="numeric" value={newItem.price.toString()} onChangeText={t => setNewItem({...newItem, price: t})} />
+                <TextInput style={styles.input} placeholder="INR (₹) 0.00" keyboardType="numeric" value={newItem.price.toString()} onChangeText={t => setNewItem({ ...newItem, price: t })} />
               </View>
-              
+
               <View style={styles.formGroup}>
                 <Text style={styles.label}>AVAILABLE QUANTITY</Text>
-                <TextInput style={styles.input} placeholder="0" keyboardType="numeric" value={newItem.quantity?.toString()} onChangeText={t => setNewItem({...newItem, quantity: t})} />
+                <TextInput style={styles.input} placeholder="0" keyboardType="numeric" value={newItem.quantity?.toString()} onChangeText={t => setNewItem({ ...newItem, quantity: t })} />
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>DESCRIPTION</Text>
-                <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Crispy golden crepe..." value={newItem.description} onChangeText={t => setNewItem({...newItem, description: t})} />
+                <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Crispy golden crepe..." value={newItem.description} onChangeText={t => setNewItem({ ...newItem, description: t })} />
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>IMAGE URL (OPTIONAL)</Text>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="https://example.com/image.jpg" value={newItem.image_url} onChangeText={t => setNewItem({...newItem, image_url: t})} />
-                  <TouchableOpacity 
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="https://example.com/image.jpg" value={newItem.image_url} onChangeText={t => setNewItem({ ...newItem, image_url: t })} />
+                  <TouchableOpacity
                     style={styles.uploadBtn}
                     onPress={() => {
                       const input = document.createElement('input');
@@ -244,8 +261,8 @@ export default function MenuManagement() {
                         if (file) {
                           try {
                             const res = await menuService.uploadImage(file);
-                            if (res.image_url) setNewItem({...newItem, image_url: res.image_url});
-                          } catch(err) { alert("Upload failed"); }
+                            if (res.image_url) setNewItem({ ...newItem, image_url: res.image_url });
+                          } catch (err) { alert("Upload failed"); }
                         }
                       };
                       input.click();
@@ -270,25 +287,29 @@ export default function MenuManagement() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  
+
   // Header
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
   subtitle: { color: '#64748b', fontSize: 13, marginTop: 4 },
   addBtn: { backgroundColor: '#ff6b35', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
   addBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
-  
+
   // Search
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 24, paddingVertical: 4, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0', width: 400, maxWidth: '100%' },
   searchInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, outlineStyle: 'none' },
-  
+
   // Categories
-  categoryScroll: { maxHeight: 40, marginBottom: 24 },
-  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'white', marginRight: 12, borderWidth: 1, borderColor: '#e2e8f0', justifyContent: 'center' },
+  categoryScroll: { marginLeft: 16, marginTop: 8, marginBottom: 24, flexGrow: 0 },
+  regionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  regionBtnActive: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
+  regionText: { color: '#64748b', fontSize: 13, fontWeight: '600' },
+  regionTextActive: { color: 'white' },
+  catBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', marginRight: 12 },
   activeCatBtn: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
   catText: { color: '#475569', fontSize: 13, fontWeight: '500' },
   activeCatText: { color: 'white', fontWeight: 'bold' },
-  
+
   // Grid
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'flex-start', paddingBottom: 100 },
   card: { width: '18%', minWidth: 220, backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, borderWidth: 1, borderColor: '#f1f5f9' },
@@ -298,37 +319,37 @@ const styles = StyleSheet.create({
   ratingText: { color: 'white', fontSize: 11, fontWeight: 'bold', marginLeft: 4 },
   pricePill: { position: 'absolute', bottom: 12, right: 12, backgroundColor: '#0f172a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   priceText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  
+
   cardBody: { padding: 16 },
   itemId: { color: '#94a3b8', fontSize: 10, fontWeight: 'bold', marginBottom: 4 },
   itemName: { fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginBottom: 6 },
   itemDesc: { color: '#64748b', fontSize: 12, lineHeight: 18, marginBottom: 16, height: 36 },
-  
+
   cardActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   availToggleContainer: { flexDirection: 'row', alignItems: 'center' },
   availText: { fontSize: 12, fontWeight: '600', color: '#64748b', marginLeft: 4 },
-  
+
   qtyContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderColor: '#f1f5f9', paddingTop: 16 },
   qtyLabel: { color: '#64748b', fontSize: 12, fontWeight: '600' },
   qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
   qtyBtn: { padding: 6 },
   qtyInput: { width: 32, textAlign: 'center', fontSize: 13, fontWeight: '600', color: '#0f172a' },
-  
+
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'center', alignItems: 'center' },
   modalCard: { backgroundColor: 'white', width: '100%', maxWidth: 450, borderRadius: 24, padding: 32, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
   modalIconBg: { backgroundColor: '#ff6b35', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
-  
+
   modalScroll: { maxHeight: 500 },
   formGroup: { marginBottom: 16 },
   label: { fontSize: 10, fontWeight: 'bold', color: '#64748b', marginBottom: 8, letterSpacing: 0.5 },
   input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, color: '#0f172a', outlineStyle: 'none' },
-  
+
   uploadBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   uploadBtnText: { color: '#475569', fontSize: 13, fontWeight: '600' },
-  
+
   modalFooter: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 32 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 32, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
   cancelBtnText: { color: '#64748b', fontSize: 14, fontWeight: '600' },

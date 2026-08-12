@@ -7,6 +7,60 @@ import api from '../services/api';
 
 const ChefMascot = require('../assets/chef.png');
 
+const PulseWave = () => {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 400, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration: 400, useNativeDriver: false })
+      ])
+    ).start();
+  }, []);
+  
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: 20, gap: 4, paddingHorizontal: 4 }}>
+      {[0, 1, 2, 3].map(i => (
+        <Animated.View key={i} style={{
+          width: 3,
+          backgroundColor: 'white',
+          borderRadius: 2,
+          height: anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: i % 2 === 0 ? [8, 16] : [14, 6]
+          })
+        }} />
+      ))}
+    </View>
+  );
+};
+
+const TypingIndicator = () => {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 500, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration: 500, useNativeDriver: false })
+      ])
+    ).start();
+  }, []);
+  return (
+    <View style={{ flexDirection: 'row', gap: 4, paddingVertical: 6, paddingHorizontal: 4 }}>
+      {[0, 1, 2].map(i => (
+        <Animated.View key={i} style={{
+          width: 6, height: 6, borderRadius: 3, backgroundColor: '#9ca3af',
+          transform: [{ translateY: anim.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: i === 1 ? [0, -4, 0] : [0, 0, 0]
+          }) }]
+        }} />
+      ))}
+    </View>
+  );
+};
+
+
 const VoiceWidget = ({ onNavigate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -410,8 +464,8 @@ const VoiceWidget = ({ onNavigate }) => {
         
         {liveText ? (
           <View style={[styles.messageRow, styles.messageRowUser]}>
-            <View style={[styles.messageBubble, styles.messageBubbleUser, { opacity: 0.8 }]}>
-              <Text style={[styles.messageText, styles.messageTextUser, { fontStyle: 'italic' }]}>{liveText}</Text>
+            <View style={[styles.messageBubble, styles.messageBubbleUser, { opacity: 0.9, paddingVertical: liveText === 'Listening...' ? 10 : 10 }]}>
+              {liveText === 'Listening...' ? <PulseWave /> : <Text style={[styles.messageText, styles.messageTextUser, { fontStyle: 'italic' }]}>{liveText}</Text>}
             </View>
           </View>
         ) : null}
@@ -422,7 +476,7 @@ const VoiceWidget = ({ onNavigate }) => {
                 <Image source={ChefMascot} style={styles.avatarImg} />
               </View>
               <View style={[styles.messageBubble, styles.messageBubbleAssistant]}>
-                <Text style={styles.messageTextAssistant}>...</Text>
+                <TypingIndicator />
               </View>
           </View>
         )}
@@ -454,11 +508,11 @@ const VoiceWidget = ({ onNavigate }) => {
         </View>
 
         <TouchableOpacity 
-          onPress={isListening ? stopListening : handleSendText} 
+          onPress={isListening ? () => stopListening(false) : handleSendText} 
           style={[styles.sendBtn, (inputText.trim() || isListening) ? styles.sendBtnActive : styles.sendBtnDisabled]}
           disabled={!isListening && !inputText.trim()}
         >
-          {isListening ? <View style={styles.stopSquare} /> : <Send size={18} color="white" />}
+          <Send size={18} color="white" />
         </TouchableOpacity>
       </View>
     </View>

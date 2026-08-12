@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { IndianRupee, CreditCard, Banknote, TrendingUp } from 'lucide-react-native';
 import { orderService } from '../services/api';
 
 export default function PaymentsManagement() {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,7 +106,7 @@ export default function PaymentsManagement() {
             </View>
           </View>
           <Text style={styles.statValue}>₹{cashPayments.toLocaleString('en-IN', {minimumFractionDigits: 1})}</Text>
-          <Text style={styles.statLabel}>Cash</Text>
+          <Text style={styles.statLabel}>{t('pay_cash')}</Text>
         </View>
       </View>
 
@@ -116,10 +118,10 @@ export default function PaymentsManagement() {
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { flex: 1.5 }]}>Order</Text>
           <Text style={[styles.th, { flex: 2 }]}>Table</Text>
-          <Text style={[styles.th, { flex: 1.5 }]}>Amount</Text>
-          <Text style={[styles.th, { flex: 2 }]}>Method</Text>
+          <Text style={[styles.th, { flex: 1.5 }]}>{t('pay_amount')}</Text>
+          <Text style={[styles.th, { flex: 2 }]}>{t('pay_method')}</Text>
           <Text style={[styles.th, { flex: 2 }]}>Time</Text>
-          <Text style={[styles.th, { flex: 1.5 }]}>Status</Text>
+          <Text style={[styles.th, { flex: 1.5 }]}>{t('ord_status')}</Text>
         </View>
         
         {loading ? <Text style={{ padding: 20 }}>Loading...</Text> : displayTransactions.map((item, index) => (

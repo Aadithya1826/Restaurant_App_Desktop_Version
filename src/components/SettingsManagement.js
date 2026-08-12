@@ -26,11 +26,11 @@ export default function SettingsManagement() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>{t('settings_system')}</Text>
-          <Text style={styles.subtitle}>Configure your restaurant preferences</Text>
+          <Text style={styles.subtitle}>{t('sm_config')}</Text>
         </View>
         <TouchableOpacity style={styles.saveBtn}>
           <CheckCircle color="white" size={16} style={{ marginRight: 8 }} />
-          <Text style={styles.saveBtnText}>Save Changes</Text>
+          <Text style={styles.saveBtnText}>{t('sm_save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -66,23 +66,23 @@ export default function SettingsManagement() {
             <View style={[styles.iconWrapper, { backgroundColor: '#ff6b35' }]}>
               <Store color="white" size={20} />
             </View>
-            <Text style={styles.cardTitle}>Restaurant Information</Text>
+            <Text style={styles.cardTitle}>{t('sm_rest_info')}</Text>
           </View>
           <View style={styles.grid}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>RESTAURANT NAME</Text>
+              <Text style={styles.label}>{t('sm_rest_name')}</Text>
               <Text style={styles.value}>Data Udipi</Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>PHONE</Text>
+              <Text style={styles.label}>{t('sm_phone')}</Text>
               <Text style={styles.value}>+91 79043 46359</Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>GST NUMBER</Text>
+              <Text style={styles.label}>{t('sm_gst')}</Text>
               <Text style={styles.value}>GSTIN</Text>
             </View>
             <View style={[styles.gridItem, { width: '100%' }]}>
-              <Text style={styles.label}>ADDRESS</Text>
+              <Text style={styles.label}>{t('sm_address')}</Text>
               <Text style={styles.value}>51, Anna Main Road, MGR Nagar, Chennai 600 078</Text>
             </View>
           </View>
@@ -94,18 +94,18 @@ export default function SettingsManagement() {
             <View style={[styles.iconWrapper, { backgroundColor: '#94a3b8' }]}>
               <Clock color="white" size={20} />
             </View>
-            <Text style={styles.cardTitle}>Opening Hours</Text>
+            <Text style={styles.cardTitle}>{t('sm_open_hours')}</Text>
           </View>
           <View style={styles.grid}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>OPENING</Text>
+              <Text style={styles.label}>{t('sm_opening')}</Text>
               <View style={styles.timeBox}>
                 <Text style={styles.value}>07:00 AM</Text>
                 <Clock color="#94a3b8" size={16} />
               </View>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>CLOSING</Text>
+              <Text style={styles.label}>{t('sm_closing')}</Text>
               <View style={styles.timeBox}>
                 <Text style={styles.value}>10:00 PM</Text>
                 <Clock color="#94a3b8" size={16} />
@@ -120,13 +120,13 @@ export default function SettingsManagement() {
             <View style={[styles.iconWrapper, { backgroundColor: '#10b981' }]}>
               <Bell color="white" size={20} />
             </View>
-            <Text style={styles.cardTitle}>Notifications</Text>
+            <Text style={styles.cardTitle}>{t('sm_notif')}</Text>
           </View>
           
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.toggleTitle}>Order Notifications</Text>
-              <Text style={styles.toggleSubtitle}>Receive platform updates via email</Text>
+              <Text style={styles.toggleTitle}>{t('sm_order_notif')}</Text>
+              <Text style={styles.toggleSubtitle}>{t('sm_order_notif_desc')}</Text>
             </View>
             <Switch 
               value={settings.orderNotifications} 
@@ -139,8 +139,8 @@ export default function SettingsManagement() {
           
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.toggleTitle}>Low stock alerts</Text>
-              <Text style={styles.toggleSubtitle}>Browser push notifications for critical alerts</Text>
+              <Text style={styles.toggleTitle}>{t('sm_low_stock')}</Text>
+              <Text style={styles.toggleSubtitle}>{t('sm_low_stock_desc')}</Text>
             </View>
             <Switch 
               value={settings.lowStockAlerts} 
@@ -153,8 +153,8 @@ export default function SettingsManagement() {
           
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.toggleTitle}>Daily email reports</Text>
-              <Text style={styles.toggleSubtitle}>Get notified for new orders across hotels</Text>
+              <Text style={styles.toggleTitle}>{t('sm_daily_email')}</Text>
+              <Text style={styles.toggleSubtitle}>{t('sm_daily_email_desc')}</Text>
             </View>
             <Switch 
               value={settings.dailyEmailReports} 
@@ -171,13 +171,13 @@ export default function SettingsManagement() {
             <View style={[styles.iconWrapper, { backgroundColor: '#ff6b35' }]}>
               <Receipt color="white" size={20} />
             </View>
-            <Text style={styles.cardTitle}>Billing & Printing</Text>
+            <Text style={styles.cardTitle}>{t('sm_billing')}</Text>
           </View>
           
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.toggleTitle}>Auto-Print Bills</Text>
-              <Text style={styles.toggleSubtitle}>Automatically print bill after payment</Text>
+              <Text style={styles.toggleTitle}>{t('sm_auto_print')}</Text>
+              <Text style={styles.toggleSubtitle}>{t('sm_auto_print_desc')}</Text>
             </View>
             <Switch 
               value={settings.autoPrintBills} 
@@ -190,8 +190,8 @@ export default function SettingsManagement() {
           
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.toggleTitle}>Print KOT</Text>
-              <Text style={styles.toggleSubtitle}>Print Kitchen Order Ticket for each order</Text>
+              <Text style={styles.toggleTitle}>{t('sm_print_kot')}</Text>
+              <Text style={styles.toggleSubtitle}>{t('sm_print_kot_desc')}</Text>
             </View>
             <Switch 
               value={settings.printKot} 
@@ -204,7 +204,7 @@ export default function SettingsManagement() {
 
           <View style={styles.grid}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>TAX RATE (%)</Text>
+              <Text style={styles.label}>{t('sm_tax')}</Text>
               <TextInput 
                 style={styles.input} 
                 value={settings.taxRate} 
@@ -213,7 +213,7 @@ export default function SettingsManagement() {
               />
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>SERVICE CHARGE (%)</Text>
+              <Text style={styles.label}>{t('sm_service')}</Text>
               <TextInput 
                 style={styles.input} 
                 value={settings.serviceCharge} 
@@ -222,7 +222,7 @@ export default function SettingsManagement() {
               />
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>PACKAGING CHARGE (₹)</Text>
+              <Text style={styles.label}>{t('sm_pkg')}</Text>
               <TextInput 
                 style={styles.input} 
                 value={settings.packagingCharge} 

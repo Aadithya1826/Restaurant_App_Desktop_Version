@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { orderService } from '../services/api';
 import { Clock, ChefHat, CheckCircle2, Truck, MoreHorizontal } from 'lucide-react-native';
@@ -11,6 +12,7 @@ const TABS = [
 ];
 
 export default function OrdersManagement() {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderMode, setOrderMode] = useState('DINE_IN'); // 'DINE_IN' or 'TAKEAWAY'
@@ -46,11 +48,25 @@ export default function OrdersManagement() {
   const dineInOrders = orders.filter(o => !isTakeaway(o));
   const takeawayOrders = orders.filter(o => isTakeaway(o));
   
-  const filteredOrders = orderMode === 'TAKEAWAY' ? takeawayOrders : dineInOrders;
+  const filteredOrders = (orderMode === 'TAKEAWAY' ? takeawayOrders : dineInOrders)
+    .sort((a, b) => b.order_id - a.order_id);
 
   const getTimeAgo = (dateString) => {
-    const hours = Math.floor((new Date() - new Date(dateString)) / 3600000);
-    return `${hours > 0 ? hours : 0} hr ago`;
+    if (!dateString) return 'Just now';
+    // Ensure dateString is treated as UTC if it lacks a timezone indicator
+    let dStr = typeof dateString === 'string' ? dateString : dateString.toString();
+    if (!dStr.includes('Z') && !dStr.includes('+')) {
+      dStr = dStr.replace(' ', 'T') + 'Z';
+    }
+    const diffMs = new Date() - new Date(dStr);
+    const minutes = Math.floor(diffMs / 60000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hr ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} days ago`;
   };
 
   const renderColumn = (tab) => {

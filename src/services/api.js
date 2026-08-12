@@ -344,6 +344,14 @@ export const reportsService = {
     const response = await api.get('/api/v1/reports', { params });
     return response.data;
   },
+  getHourlyReport: async (params = {}) => {
+    const response = await api.get('/api/v1/reports/hourly', { params });
+    return response.data;
+  },
+  getItemWiseReport: async (params = {}) => {
+    const response = await api.get('/api/v1/reports/items', { params });
+    return response.data;
+  },
   getConsumptionReport: async (date) => {
     const response = await api.get('/api/v1/reports/consumption', { params: { report_date: date } });
     return response.data;

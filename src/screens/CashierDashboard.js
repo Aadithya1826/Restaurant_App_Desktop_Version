@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, Dimensions, Platform } from 'react-native';
+import { useLanguage } from '../context/LanguageContext';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { menuService } from '../services/api';
 import api from '../services/api';
@@ -9,10 +10,10 @@ import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
 import { Picker } from '@react-native-picker/picker';
 
-const { width } = Dimensions.get('window');
-const isTablet = width > 600;
-
 export default function CashierDashboard({ navigation }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 1024;
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
@@ -36,9 +37,15 @@ export default function CashierDashboard({ navigation }) {
   const [lastFutureSale, setLastFutureSale] = useState(null);
   const [lastPaymentMethod, setLastPaymentMethod] = useState('');
   const [lastCart, setLastCart] = useState([]);
+  const [restaurantData, setRestaurantData] = useState(null);
 
   useEffect(() => {
     if (!user || !user.restaurant_id) return;
+    
+    api.get(`/api/v1/restaurants/${user.restaurant_id}`)
+      .then(data => setRestaurantData(data))
+      .catch(err => console.error('Failed to fetch restaurant', err));
+
     menuService.getItems({ restaurant_id: user.restaurant_id })
       .then(data => Array.isArray(data) && setMenuItems(data))
       .catch(err => console.error(err));
@@ -95,7 +102,11 @@ export default function CashierDashboard({ navigation }) {
   const addProductToCart = () => {
     const code = productCodeInput.trim().toLowerCase();
     if (code) {
-      const item = menuItems.find(i => String(i.item_code).toLowerCase() === code);
+      const item = menuItems.find(i => 
+        String(i.item_code).toLowerCase() === code || 
+        String(i.id).toLowerCase() === code ||
+        String(i.product_code).toLowerCase() === code
+      );
       if (item) {
         addItemToCart(item);
         setProductCodeInput('');
@@ -140,9 +151,90 @@ export default function CashierDashboard({ navigation }) {
     setLastFutureSale({ ...futureSale });
     setFutureSale({ name: '', address: '', city: '', phone: '', deliveryDate: '' });
     setShowInvoice(true);
-    setTimeout(() => {
-      window.print();
-    }, 500);
+    
+    if (Platform.OS === 'web') {
+      const currentDate = new Date().toLocaleString('en-US', {
+        month: 'numeric', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+      });
+      
+      const itemRows = cart.map(item => `
+        <div class="row">
+          <div class="item-name">${item.description}</div>
+          <div class="item-qty">${item.qty}</div>
+          <div class="item-amt">${item.amount.toFixed(2)}</div>
+        </div>
+      `).join('');
+
+      const resName = restaurantData?.name || 'DATA UDIPI HOTEL';
+      const resAddr = restaurantData?.address || 'M G R Nagar, Chennai';
+      const resPhone = restaurantData?.phone || '31595014';
+
+      const html = `
+        <html>
+          <head>
+            <style>
+              @page { margin: 0; }
+              body { font-family: monospace; font-size: 12px; margin: 0; padding: 5px; width: 72mm; color: #000; }
+              .center { text-align: center; }
+              h1 { font-size: 16px; margin: 5px 0; }
+              .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+              .row { display: flex; justify-content: space-between; }
+              .item-name { flex: 2; word-break: break-all; padding-right: 5px; }
+              .item-qty { width: 30px; text-align: right; }
+              .item-amt { width: 60px; text-align: right; }
+              .bold { font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="center">
+              <h1>${resName}</h1>
+              <div>${resAddr}</div>
+              <div>Phone: ${resPhone}</div>
+              <div class="bold" style="margin-top: 5px;">COUNTER POS</div>
+            </div>
+            <div class="divider"></div>
+            <div class="row">
+              <span class="bold">Bill No: ${billNo}</span>
+              <span>${currentDate}</span>
+            </div>
+            <div>
+              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'} | 
+              <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
+            </div>
+            ${futureSale.name ? `<div>Future Sale: ${futureSale.name}</div>` : ''}
+            <div class="divider"></div>
+            <div class="row bold">
+              <div class="item-name">Item</div>
+              <div class="item-qty">Qty</div>
+              <div class="item-amt">Amt</div>
+            </div>
+            <div class="divider"></div>
+            ${itemRows}
+            <div class="divider"></div>
+            <div class="row bold" style="font-size: 14px;">
+              <span>TOTAL</span>
+              <span>₹${totalAmt.toFixed(2)}</span>
+            </div>
+            <div class="divider"></div>
+            <div class="center" style="margin-top: 10px;">Thank you! Visit again.</div>
+            <div class="center" style="margin-top: 10px; font-size: 10px;">Techwizard AI partners<br/>vasu@t-wi.com</div>
+          </body>
+        </html>
+      `;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      iframe.contentWindow.document.open();
+      iframe.contentWindow.document.write(html);
+      iframe.contentWindow.document.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        document.body.removeChild(iframe);
+      }, 500);
+    }
   };
 
   const handleLogout = async () => {
@@ -156,7 +248,9 @@ export default function CashierDashboard({ navigation }) {
     if (search) {
       const matchName = item.name && item.name.toLowerCase().includes(search);
       const matchCode = item.item_code && String(item.item_code).toLowerCase().includes(search);
-      if (!matchName && !matchCode) return false;
+      const matchId = item.id && String(item.id).toLowerCase().includes(search);
+      const matchProductCode = item.product_code && String(item.product_code).toLowerCase().includes(search);
+      if (!matchName && !matchCode && !matchId && !matchProductCode) return false;
     }
     return true;
   });
@@ -209,14 +303,14 @@ export default function CashierDashboard({ navigation }) {
             </View>
             <TextInput
               style={styles.searchInput}
-              placeholder="Enter item code (e.g. C01)"
+              placeholder={t("cashier_search_code")}
               value={productCodeInput}
               onChangeText={setProductCodeInput}
               onSubmitEditing={addProductToCart}
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search item..."
+              placeholder={t("cashier_search_item")}
               value={descriptionInput}
               onChangeText={setDescriptionInput}
             />
@@ -254,9 +348,9 @@ export default function CashierDashboard({ navigation }) {
 
           <View style={styles.tableContainer}>
             <View style={styles.tableHeader}>
-              <Text style={[styles.thText, { width: 80 }]}>CODE</Text>
-              <Text style={[styles.thText, { flex: 1 }]}>ITEM</Text>
-              <Text style={[styles.thText, { width: 100, textAlign: 'right', paddingRight: 40 }]}>PRICE</Text>
+              <Text style={[styles.thText, { width: 80 }]}>{t('cashier_code')}</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>{t('cashier_item')}</Text>
+              <Text style={[styles.thText, { width: 100, textAlign: 'right', paddingRight: 40 }]}>{t('cashier_price')}</Text>
             </View>
             <FlatList
               data={filteredItems}
@@ -283,9 +377,9 @@ export default function CashierDashboard({ navigation }) {
         {/* Right Panel (Cart) */}
         <View style={[styles.rightPanel, { flex: isTablet ? 3 : 1 }]}>
           <View style={styles.cartHeaderTop}>
-            <Text style={styles.cartHeaderTitle}>Current order</Text>
+            <Text style={styles.cartHeaderTitle}>{t('cashier_current_order')}</Text>
             <TouchableOpacity onPress={() => setCart([])} dataSet={{ hover: 'btn' }}>
-              <Text style={styles.clearText}>Clear</Text>
+              <Text style={styles.clearText}>{t('cashier_clear')}</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.cartSubtitle}>{cart.length} lines · {cart.reduce((a, b) => a + b.qty, 0)} items</Text>
@@ -316,11 +410,11 @@ export default function CashierDashboard({ navigation }) {
               <Text style={styles.futureSaleLightText}>+ Future Sale</Text>
             </TouchableOpacity>
             <View style={styles.subtotalRow}>
-              <Text style={styles.subtotalLabel}>Subtotal</Text>
+              <Text style={styles.subtotalLabel}>{t('cashier_subtotal')}</Text>
               <Text style={styles.subtotalValue}>₹{totalAmount.toFixed(2)}</Text>
             </View>
             <View style={styles.totalRowFixed}>
-              <Text style={styles.totalLabelFixed}>Total</Text>
+              <Text style={styles.totalLabelFixed}>{t('cashier_total')}</Text>
               <Text style={styles.totalValueFixed}>₹{totalAmount.toFixed(2)}</Text>
             </View>
             <TouchableOpacity style={styles.chargeBtnDark} onPress={handleCheckout} dataSet={{ hover: 'btn' }}>
@@ -330,10 +424,16 @@ export default function CashierDashboard({ navigation }) {
         </View>
       </View>
 
-      <InvoiceModal
-        show={showInvoice} setShow={setShowInvoice}
-        lastBillNo={lastBillNo} lastOrderType={lastOrderType} lastPaymentMethod={lastPaymentMethod}
-        lastFutureSale={lastFutureSale} lastCart={lastCart} lastBillAmt={lastBillAmt}
+      <InvoiceModal 
+        show={showInvoice} 
+        setShow={setShowInvoice} 
+        lastBillNo={lastBillNo} 
+        lastOrderType={lastOrderType} 
+        lastPaymentMethod={lastPaymentMethod} 
+        lastFutureSale={lastFutureSale} 
+        lastCart={lastCart} 
+        lastBillAmt={lastBillAmt}
+        restaurantData={restaurantData}
       />
       <FutureSaleModal show={showFutureSaleModal} setShow={setShowFutureSaleModal} futureSale={futureSale} setFutureSale={setFutureSale} />
     </View>

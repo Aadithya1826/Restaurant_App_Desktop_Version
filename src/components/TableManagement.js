@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, TextInput, Modal, Platform } from 'react-native';
 import { tableService } from '../services/api';
 import { Plus, Users, Download, Edit2, Trash2, X, ChevronDown } from 'lucide-react-native';
 
 export default function TableManagement() {
+  const { t } = useLanguage();
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -81,7 +83,7 @@ export default function TableManagement() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
             <Plus color="white" size={16} style={{ marginRight: 6 }} />
-            <Text style={styles.addBtnText}>Add Table</Text>
+            <Text style={styles.addBtnText}>{t('tbl_add')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -90,7 +92,7 @@ export default function TableManagement() {
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, { backgroundColor: 'rgba(255, 107, 53, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#ff6b35' }]}>{occupiedCount}</Text>
-          <Text style={styles.statLabel}>Occupied</Text>
+          <Text style={styles.statLabel}>{t('tbl_occupied')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#10b981' }]}>{vacantCount}</Text>
@@ -98,7 +100,7 @@ export default function TableManagement() {
         </View>
         <View style={[styles.statCard, { backgroundColor: 'rgba(59, 130, 246, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#3b82f6' }]}>{reservedCount}</Text>
-          <Text style={styles.statLabel}>Reserved</Text>
+          <Text style={styles.statLabel}>{t('tbl_reserved')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: 'transparent' }]}>
           <Text style={[styles.statValue, { color: '#64748b' }]}>{inactiveCount}</Text>

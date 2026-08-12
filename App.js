@@ -15,6 +15,19 @@ import VoiceWidget from './src/components/VoiceWidget';
 import OfflineSetupModal from './src/components/OfflineSetupModal';
 import { initOfflineSync } from './src/services/offlineSync';
 
+if (Platform.OS === 'web') {
+  const style = document.createElement('style');
+  style.type = 'text/css';
+  style.innerHTML = `
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Telugu:wght@400;600;700&family=Noto+Sans+Kannada:wght@400;600;700&family=Noto+Sans+Malayalam:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap');
+    
+    * {
+      font-family: 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Bengali', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {

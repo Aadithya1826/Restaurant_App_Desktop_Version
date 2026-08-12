@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Modal, Platform } from 'react-native';
 import { inventoryService } from '../services/api';
 import { Plus, Package, TrendingDown, CheckCircle2, Edit2, Trash2, Search, X, FileScan, CheckCircle, AlertTriangle, Upload, Camera } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function InventoryManagement({ setActiveTab }) {
+  const { t } = useLanguage();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -224,7 +226,7 @@ export default function InventoryManagement({ setActiveTab }) {
           )}
           <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
             <Plus color="white" size={16} style={{ marginRight: 6 }} />
-            <Text style={styles.addBtnText}>Add Item</Text>
+            <Text style={styles.addBtnText}>{t('inv_add_item')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.addBtn, { marginLeft: 12 }]} onPress={() => setIsScanModalOpen(true)}>
             <FileScan color="white" size={16} style={{ marginRight: 6 }} />
@@ -291,7 +293,7 @@ export default function InventoryManagement({ setActiveTab }) {
             <Text style={styles.th}>Unit</Text>
             <Text style={[styles.th, { flex: 1.5 }]}>Last Restocked</Text>
             <Text style={[styles.th, { flex: 1.2 }]}>Status</Text>
-            <Text style={[styles.th, { flex: 0.8, textAlign: 'right', paddingRight: 16 }]}>Actions</Text>
+            <Text style={[styles.th, { flex: 0.8, textAlign: 'right', paddingRight: 16 }]}>{t('inv_actions')}</Text>
           </View>
           
           {filteredInventory.map((item, index) => {
@@ -350,7 +352,7 @@ export default function InventoryManagement({ setActiveTab }) {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Item Name</Text>
+              <Text style={styles.label}>{t('inv_item_name')}</Text>
               <TextInput style={styles.input} placeholder="e.g. Rice Flour" value={formData.name} onChangeText={t => setFormData({...formData, name: t})} />
             </View>
 

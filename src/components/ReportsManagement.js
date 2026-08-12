@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator } from 'react-native';
-import { IndianRupee, TrendingUp, TrendingDown, Clock, Activity, BarChart2, Package } from 'lucide-react-native';
+import { useLanguage } from '../context/LanguageContext';
+import { View, Text, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { IndianRupee, TrendingUp, TrendingDown, Clock, Activity, BarChart2, Package, Printer } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Circle, Text as SvgText } from 'react-native-svg';
 import { reportsService } from '../services/api';
+import ReportView from './ReportView';
 
 export default function ReportsManagement() {
+  const { t } = useLanguage();
   const [chartAnim] = useState(new Animated.Value(0));
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reportPrintType, setReportPrintType] = useState(null);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -35,6 +39,17 @@ export default function ReportsManagement() {
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#ff8c42" />
         <Text style={{ marginTop: 16, color: '#64748b' }}>Loading reports data...</Text>
+      </View>
+    );
+  }
+
+  if (reportPrintType) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ReportView 
+          type={reportPrintType} 
+          onBack={() => setReportPrintType(null)} 
+        />
       </View>
     );
   }
@@ -141,6 +156,24 @@ export default function ReportsManagement() {
         <StatCard iconBg="#10b981" value={summary?.avg_order_value?.value || 0} label="Avg. Order Value" trend={summary?.avg_order_value?.change || "0%"} isPositive={!(summary?.avg_order_value?.change || "").includes("-")} />
       </View>
 
+      {/* Daily Bill Reports Section */}
+      <View style={styles.dailyReportsSection}>
+        <View>
+          <Text style={styles.dailyReportsTitle}>Daily Bill Reports</Text>
+          <Text style={styles.dailyReportsSubtitle}>Generate and print detailed reports for today's sales.</Text>
+        </View>
+        <View style={styles.dailyReportsActions}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setReportPrintType('hourly')}>
+            <Printer size={16} color="#111" style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryBtnText}>Hourly Report</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => setReportPrintType('item')}>
+            <Printer size={16} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.primaryBtnText}>Item Wise Report</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Charts Grid */}
       <View style={styles.gridRow}>
         
@@ -165,9 +198,20 @@ export default function ReportsManagement() {
             <Text style={styles.cardTitle}>Payment Methods</Text>
           </View>
           <View style={styles.barList}>
-            {payment_methods && payment_methods.slice(0, 5).map((pm, idx) => (
-              <HorizontalBar key={pm.name} label={pm.name} amountStr={`₹${Number(pm.value).toLocaleString('en-IN')}`} percent={(pm.value / maxPayment) * 100} color={paymentColors[idx % paymentColors.length]} />
-            ))}
+            {payment_methods && payment_methods.filter(Boolean).slice(0, 5).map((pm, idx) => {
+              const name = pm?.name || pm?.method || 'Unknown';
+              const val = Number(pm?.value || pm?.amount || 0);
+              const pct = maxPayment > 0 ? (val / maxPayment) * 100 : 0;
+              return (
+                <HorizontalBar 
+                  key={name + idx} 
+                  label={name} 
+                  amountStr={`₹${val.toLocaleString('en-IN')}`} 
+                  percent={isNaN(pct) ? 0 : pct} 
+                  color={paymentColors[idx % paymentColors.length]} 
+                />
+              );
+            })}
           </View>
         </View>
 
@@ -231,6 +275,16 @@ const styles = StyleSheet.create({
   trendText: { fontSize: 12, fontWeight: 'bold' },
   statValue: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 4 },
   statLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '500' },
+
+  // Daily Reports
+  dailyReportsSection: { backgroundColor: 'white', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 32, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
+  dailyReportsTitle: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
+  dailyReportsSubtitle: { fontSize: 13, color: '#64748b' },
+  dailyReportsActions: { flexDirection: 'row', gap: 12 },
+  secondaryBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: 'white', cursor: 'pointer' },
+  secondaryBtnText: { fontWeight: '500', color: '#111' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#ff8c42', cursor: 'pointer' },
+  primaryBtnText: { fontWeight: '500', color: 'white' },
 
   // Grid
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },

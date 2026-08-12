@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Dimensions, Image, Platform, DeviceEventEmitter, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Image, Platform, DeviceEventEmitter, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,15 +11,17 @@ import {
   MapPin, AlertCircle, ChevronRight, TrendingUp, CreditCard, Check
 } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
-
-const DataudipiTitle = require('../assets/Dataudupi-Title.png');
-
 export default function AdminDashboard({ navigation }) {
+  const DataudipiTitle = require('../assets/Dataudupi-Title.png');
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 1024;
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(isTablet);
+
+  useEffect(() => {
+    setSidebarOpen(isTablet);
+  }, [isTablet]);
   const { t, language, setLanguage } = useLanguage();
 
   const [hotels, setHotels] = useState([]);
@@ -182,7 +184,7 @@ export default function AdminDashboard({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: 'rgba(255, 140, 66, 0.15)' }]}>
               <Building2 color="#ff8c42" size={24} />
             </View>
-            <Text style={styles.statTrendText}>Active on platform</Text>
+            <Text style={styles.statTrendText}>{t('admin_active_on_platform')}</Text>
           </View>
           <Text style={styles.statValue}>{hotels.length}</Text>
           <Text style={styles.statLabel}>{t('total_hotels')}</Text>
@@ -193,7 +195,7 @@ export default function AdminDashboard({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: 'rgba(45, 122, 74, 0.15)' }]}>
               <Users2 color="#2d7a4a" size={24} />
             </View>
-            <Text style={styles.statTrendText}>Assigned managers</Text>
+            <Text style={styles.statTrendText}>{t('admin_assigned_managers')}</Text>
           </View>
           <Text style={styles.statValue}>{managers.length}</Text>
           <Text style={styles.statLabel}>{t('active_managers')}</Text>
@@ -207,7 +209,7 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.statTrendText}>{reports?.summary?.today_revenue?.change || '0%'}</Text>
           </View>
           <Text style={styles.statValue}>₹{(reports?.summary?.today_revenue?.value || 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Platform Revenue (Today)</Text>
+          <Text style={styles.statLabel}>{t('admin_platform_rev_today')}</Text>
         </View>
 
         <View style={styles.statCard}>
@@ -218,16 +220,16 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.statTrendText}>Out of {tables.length} total</Text>
           </View>
           <Text style={styles.statValue}>{tables.filter(t => t.is_active).length}</Text>
-          <Text style={styles.statLabel}>Active Tables</Text>
+          <Text style={styles.statLabel}>{t('admin_active_tables_cap')}</Text>
         </View>
       </View>
 
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Top Performing Hotels</Text>
+        <Text style={styles.sectionTitle}>{t('admin_top_hotels')}</Text>
         <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderText, { flex: 2 }]}>Hotel</Text>
-          <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Revenue</Text>
-          <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Growth</Text>
+          <Text style={[styles.tableHeaderText, { flex: 2 }]}>{t('admin_hotel')}</Text>
+          <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>{t('admin_revenue')}</Text>
+          <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>{t('admin_growth')}</Text>
         </View>
 
         {((reports?.top_hotels && reports.top_hotels.length > 0) ? reports.top_hotels : hotels.slice(0, 5)).map((h, i) => (
@@ -242,11 +244,11 @@ export default function AdminDashboard({ navigation }) {
               </View>
             </View>
             <Text style={[styles.rowTitle, { flex: 1, textAlign: 'right' }]}>
-              ₹{(h.revenue || Math.floor(Math.random() * 10000)).toLocaleString()}
+              ₹{(h.revenue || 0).toLocaleString()}
             </Text>
             <View style={{ width: 80, alignItems: 'flex-end' }}>
               <View style={styles.growthPill}>
-                <Text style={styles.growthText}>{h.growth || '+12%'}</Text>
+                <Text style={styles.growthText}>{h.growth || '0%'}</Text>
               </View>
             </View>
           </View>
@@ -254,17 +256,17 @@ export default function AdminDashboard({ navigation }) {
       </View>
 
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={styles.sectionTitle}>{t('admin_recent_activity')}</Text>
         {hotels.slice(0, 3).map((h, i) => (
           <View key={i} style={styles.activityRow}>
             <View style={[styles.iconWrapper, { backgroundColor: '#ff8c42', width: 40, height: 40 }]}>
               <Building2 color="white" size={20} />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.rowTitle}>New hotel added</Text>
+              <Text style={styles.rowTitle}>{t('admin_new_hotel_added')}</Text>
               <Text style={styles.rowSubtitle}>{h.name} - {h.address}</Text>
             </View>
-            <Text style={styles.activityTime}>Just now</Text>
+            <Text style={styles.activityTime}>{t('admin_just_now')}</Text>
           </View>
         ))}
       </View>
@@ -275,18 +277,18 @@ export default function AdminDashboard({ navigation }) {
   const renderHotels = () => (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <View style={{ marginBottom: 24, marginTop: 10 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>Hotels & Venues</Text>
-        <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>Manage hotel records from the restaurant table. Add new hotels, search existing venues, and review address and contact details.</Text>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>{t('admin_hotels_venues')}</Text>
+        <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>{t('admin_hotels_desc')}</Text>
       </View>
 
       <TouchableOpacity style={styles.primaryBtnLarge} onPress={() => setShowAddHotel(true)} dataSet={{ hover: 'btn' }}>
         <Building2 color="white" size={18} style={{ marginRight: 8 }} />
-        <Text style={styles.primaryBtnLargeText}>ADD HOTEL</Text>
+        <Text style={styles.primaryBtnLargeText}>{t('admin_add_hotel')}</Text>
       </TouchableOpacity>
       
       <View style={styles.searchBarContainer}>
-        <TextInput style={styles.searchInput} placeholder="Search hotels..." placeholderTextColor="#9ca3af" />
-        <Text style={styles.searchSubText}>{hotels.length} hotels registered on the platform</Text>
+        <TextInput style={styles.searchInput} placeholder={t("admin_search_hotels")} placeholderTextColor="#9ca3af" />
+        <Text style={styles.searchSubText}>{hotels.length} {t('admin_hotels_registered')}</Text>
       </View>
 
       <View style={styles.grid}>
@@ -299,7 +301,7 @@ export default function AdminDashboard({ navigation }) {
               <View style={styles.cardActions}>
                 <TouchableOpacity style={styles.iconActionBtn} onPress={() => { setEditingHotel(item); setShowEditHotel(true); }}><Pencil size={14} color="#6b7280" /></TouchableOpacity>
                 <TouchableOpacity style={styles.iconActionBtn} onPress={() => deleteHotel(item.id)}><Trash2 size={14} color="#ef4444" /></TouchableOpacity>
-                <View style={styles.activePill}><Text style={styles.activePillText}>ACTIVE</Text></View>
+                <View style={styles.activePill}><Text style={styles.activePillText}>{t('admin_active_cap')}</Text></View>
               </View>
             </View>
             
@@ -311,15 +313,15 @@ export default function AdminDashboard({ navigation }) {
             <View style={styles.cardStatsRow}>
               <View style={styles.cardStatCol}>
                 <Text style={styles.cardStatValue}>{item.venues || 1}</Text>
-                <Text style={styles.cardStatLabel}>Venues</Text>
+                <Text style={styles.cardStatLabel}>{t('admin_venues')}</Text>
               </View>
               <View style={styles.cardStatCol}>
-                <Text style={styles.cardStatValue}>{item.orders || 194}</Text>
-                <Text style={styles.cardStatLabel}>Orders</Text>
+                <Text style={styles.cardStatValue}>{item.orders || 0}</Text>
+                <Text style={styles.cardStatLabel}>{t('admin_orders_cap')}</Text>
               </View>
               <View style={styles.cardStatCol}>
-                <Text style={[styles.cardStatValue, { color: '#f97316' }]}>₹{((item.revenue || 39559)).toLocaleString()}</Text>
-                <Text style={styles.cardStatLabel}>Revenue</Text>
+                <Text style={[styles.cardStatValue, { color: '#f97316' }]}>₹{((item.revenue || 0)).toLocaleString()}</Text>
+                <Text style={styles.cardStatLabel}>{t('admin_revenue')}</Text>
               </View>
             </View>
 
@@ -337,18 +339,18 @@ export default function AdminDashboard({ navigation }) {
   const renderManagers = () => (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <View style={{ marginBottom: 24, marginTop: 10 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>Managers</Text>
-        <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>Manage hotel managers and their assignments</Text>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>{t('admin_managers_title')}</Text>
+        <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>{t('admin_managers_desc')}</Text>
       </View>
 
       <TouchableOpacity style={styles.primaryBtnLarge} onPress={() => setShowAddManager(true)} dataSet={{ hover: 'btn' }}>
         <Users color="white" size={18} style={{ marginRight: 8 }} />
-        <Text style={styles.primaryBtnLargeText}>ADD MANAGER</Text>
+        <Text style={styles.primaryBtnLargeText}>{t('admin_add_manager')}</Text>
       </TouchableOpacity>
       
       <View style={styles.searchBarContainer}>
-        <TextInput style={styles.searchInput} placeholder="Search managers or hotels..." placeholderTextColor="#9ca3af" />
-        <Text style={styles.searchSubText}>{managers.length} managers on platform</Text>
+        <TextInput style={styles.searchInput} placeholder={t("admin_search_managers")} placeholderTextColor="#9ca3af" />
+        <Text style={styles.searchSubText}>{managers.length} {t('admin_managers_on_platform')}</Text>
       </View>
 
       <View style={styles.grid}>
@@ -364,7 +366,7 @@ export default function AdminDashboard({ navigation }) {
                   </View>
                   <View style={{ marginLeft: 12 }}>
                     <Text style={styles.cardTitle}>{item.name}</Text>
-                    <View style={[styles.activePill, { marginTop: 4, alignSelf: 'flex-start' }]}><Text style={styles.activePillText}>ACTIVE</Text></View>
+                    <View style={[styles.activePill, { marginTop: 4, alignSelf: 'flex-start' }]}><Text style={styles.activePillText}>{t('admin_active_cap')}</Text></View>
                   </View>
                 </View>
                 <View style={styles.cardActions}>
@@ -389,7 +391,7 @@ export default function AdminDashboard({ navigation }) {
                 </View>
                 <View style={styles.contactRow}>
                   <Text style={{ fontSize: 14, marginRight: 8, color: '#9ca3af' }}>👤</Text>
-                  <Text style={styles.contactText}>Manager - Joined {new Date(item.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</Text>
+                  <Text style={styles.contactText}>Manager - {t('admin_joined')} {new Date(item.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</Text>
                 </View>
               </View>
             </View>
@@ -410,15 +412,15 @@ export default function AdminDashboard({ navigation }) {
         
         {/* Page Title inside scroll */}
         <View style={{ marginBottom: 24, marginTop: 10 }}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>Reports & Analytics</Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>Platform-wide performance insights</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>{t('admin_reports_analytics')}</Text>
+          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>{t('admin_reports_desc')}</Text>
         </View>
 
         {/* Metric Cards */}
         <View style={styles.statsGrid}>
           <View style={styles.reportMetricCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reportMetricLabel}>TODAY'S PLATFORM REVENUE</Text>
+              <Text style={styles.reportMetricLabel}>{t('admin_today_rev')}</Text>
               <Text style={styles.reportMetricValue}>₹{totalRev.toLocaleString()}</Text>
             </View>
             <View style={[styles.iconWrapper, { backgroundColor: '#fef3ec', width: 56, height: 56, borderRadius: 16 }]}>
@@ -428,7 +430,7 @@ export default function AdminDashboard({ navigation }) {
           
           <View style={styles.reportMetricCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reportMetricLabel}>TODAY'S ORDERS</Text>
+              <Text style={styles.reportMetricLabel}>{t('admin_today_orders')}</Text>
               <Text style={styles.reportMetricValue}>{totalOrders}</Text>
             </View>
             <View style={[styles.iconWrapper, { backgroundColor: '#eefcf5', width: 56, height: 56, borderRadius: 16 }]}>
@@ -438,7 +440,7 @@ export default function AdminDashboard({ navigation }) {
 
           <View style={styles.reportMetricCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reportMetricLabel}>AVG. ORDER VALUE</Text>
+              <Text style={styles.reportMetricLabel}>{t('admin_avg_order_value')}</Text>
               <Text style={styles.reportMetricValue}>₹{Math.round(avgOrderValue)}</Text>
             </View>
             <View style={[styles.iconWrapper, { backgroundColor: '#fffbe5', width: 56, height: 56, borderRadius: 16 }]}>
@@ -448,7 +450,7 @@ export default function AdminDashboard({ navigation }) {
 
           <View style={styles.reportMetricCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reportMetricLabel}>CUSTOMER SATISFACTION</Text>
+              <Text style={styles.reportMetricLabel}>{t('admin_customer_sat')}</Text>
               <Text style={styles.reportMetricValue}>4.8/5</Text>
             </View>
             <View style={[styles.iconWrapper, { backgroundColor: '#fdf2f8', width: 56, height: 56, borderRadius: 16 }]}>
@@ -460,9 +462,9 @@ export default function AdminDashboard({ navigation }) {
         {/* Top Chart Area */}
         <View style={[styles.reportsCard, { padding: 0, overflow: 'hidden' }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, paddingBottom: 0 }}>
-            <Text style={styles.reportsCardTitle}>Monthly Revenue Trend</Text>
+            <Text style={styles.reportsCardTitle}>{t('admin_monthly_rev_trend')}</Text>
             <View style={styles.filterPill}>
-              <Text style={styles.filterPillText}>Last 6 months</Text>
+              <Text style={styles.filterPillText}>{t('admin_last_6_months')}</Text>
             </View>
           </View>
 
@@ -491,8 +493,8 @@ export default function AdminDashboard({ navigation }) {
 
         <View style={styles.reportsCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-            <Text style={styles.reportsCardTitle}>Payment Methods</Text>
-            <Text style={styles.reportsCardSubtitle}>Share</Text>
+            <Text style={styles.reportsCardTitle}>{t('admin_payment_methods')}</Text>
+            <Text style={styles.reportsCardSubtitle}>{t('admin_share')}</Text>
           </View>
 
           {reports?.payment_methods?.map((item, idx) => {
@@ -521,18 +523,18 @@ export default function AdminDashboard({ navigation }) {
         <View style={styles.reportsCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
             <View>
-              <Text style={styles.reportsCardTitle}>Hotel Performance</Text>
-              <Text style={[styles.reportsCardSubtitle, { marginTop: 4 }]}>Performance summary across the top venues</Text>
+              <Text style={styles.reportsCardTitle}>{t('admin_hotel_perf')}</Text>
+              <Text style={[styles.reportsCardSubtitle, { marginTop: 4 }]}>{t('admin_perf_summary')}</Text>
             </View>
             <Text style={styles.reportsCardSubtitle}>Updated just now</Text>
           </View>
 
           <View style={styles.perfTableHeader}>
-            <Text style={[styles.perfHeaderText, { flex: 2 }]}>Hotel</Text>
-            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>Revenue</Text>
-            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>Orders</Text>
-            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>Growth</Text>
-            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'right' }]}>Performance</Text>
+            <Text style={[styles.perfHeaderText, { flex: 2 }]}>{t('admin_hotel')}</Text>
+            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>{t('admin_revenue')}</Text>
+            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>{t('admin_orders_cap')}</Text>
+            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'center' }]}>{t('admin_growth')}</Text>
+            <Text style={[styles.perfHeaderText, { flex: 1, textAlign: 'right' }]}>{t('admin_performance')}</Text>
           </View>
 
           {(reports?.top_hotels || []).map((h, i) => (
@@ -561,7 +563,7 @@ export default function AdminDashboard({ navigation }) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, marginTop: 10 }}>
         <View>
           <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111' }}>{t('settings_system')}</Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>Configure platform-wide preferences</Text>
+          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>{t('admin_settings_desc')}</Text>
         </View>
         <TouchableOpacity style={styles.primaryBtnSmall} dataSet={{ hover: 'btn' }}>
           <Text style={styles.primaryBtnSmallText}>Save Changes</Text>
@@ -574,12 +576,12 @@ export default function AdminDashboard({ navigation }) {
             <Text style={styles.avatarText}>SA</Text>
           </View>
           <View style={{ marginLeft: 16 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#111' }}>Platform Admin</Text>
-            <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Platform Administrator</Text>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#111' }}>{t('admin_platform_admin')}</Text>
+            <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t('admin_platform_administrator')}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.signOutBtn}>
-          <Text style={styles.signOutBtnText}>Sign out</Text>
+          <Text style={styles.signOutBtnText}>{t('admin_sign_out')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -630,8 +632,8 @@ export default function AdminDashboard({ navigation }) {
 
         <View style={[styles.settingsRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
           <View>
-            <Text style={styles.settingsRowTitle}>Auto-assign Managers</Text>
-            <Text style={styles.settingsRowDesc}>Automatically link new venues</Text>
+            <Text style={styles.settingsRowTitle}>{t('admin_auto_assign')}</Text>
+            <Text style={styles.settingsRowDesc}>{t('admin_auto_link')}</Text>
           </View>
           <TouchableOpacity onPress={() => setAutoAssignManagers(!autoAssignManagers)} style={autoAssignManagers ? styles.toggleTrackActive : styles.toggleTrack}>
             <View style={autoAssignManagers ? styles.toggleThumbActive : styles.toggleThumb} />
@@ -695,7 +697,7 @@ export default function AdminDashboard({ navigation }) {
         </View>
 
         <TouchableOpacity style={{ marginTop: 24, paddingBottom: 12 }}>
-          <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: 'bold' }}>Export System Data</Text>
+          <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: 'bold' }}>{t('admin_export_data')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -730,7 +732,7 @@ export default function AdminDashboard({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'reports' && styles.activeNav]} onPress={() => { setActiveTab('reports'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <BarChart3 color={activeTab === 'reports' ? '#ff8c42' : '#9ca3af'} size={20} />
-                <Text style={[styles.navText, activeTab === 'reports' && styles.activeNavText]}>Reports</Text>
+                <Text style={[styles.navText, activeTab === 'reports' && styles.activeNavText]}>{t('nav_reports')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.navItem, activeTab === 'settings' && styles.activeNav]} onPress={() => { setActiveTab('settings'); if (!isTablet) setSidebarOpen(false); }} dataSet={{ hover: 'nav' }}>
                 <Settings color={activeTab === 'settings' ? '#ff8c42' : '#9ca3af'} size={20} />
@@ -975,8 +977,15 @@ const styles = StyleSheet.create({
   statusPillText: { color: '#065f46', fontSize: 12, fontWeight: '600' },
 
   // Dashboard & Reports Specific Styles
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 24 },
-  statCard: { backgroundColor: '#fff', padding: 20, borderRadius: 16, flex: 1, minWidth: 200, borderWidth: 1, borderColor: '#f3f4f6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  statsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginBottom: 30 },
+  statCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    flexBasis: '23%',
+    flexGrow: 1,
+    minWidth: 160,
+    borderWidth: 1, borderColor: '#f3f4f6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
   statIconHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   iconWrapper: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   statTrendText: { color: '#2d7a4a', fontSize: 12, fontWeight: '600' },

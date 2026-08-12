@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, DeviceEventEmitter, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, DeviceEventEmitter, Image } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { orderService, tableService, reportsService } from '../services/api';
@@ -19,15 +19,18 @@ import SettingsManagement from '../components/SettingsManagement';
 import ConsumptionReports from '../components/ConsumptionReports';
 import { Wallet } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
-
 const DataudipiTitle = require('../assets/Dataudupi-Title.png');
 
 export default function HotelManagerDashboard({ navigation }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 1024;
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(isTablet);
+
+  useEffect(() => {
+    setSidebarOpen(isTablet);
+  }, [isTablet]);
   const { t, language } = useLanguage();
   const [hoverLogout, setHoverLogout] = useState(false);
 
@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
   
   // Main Content
   mainContent: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden', minHeight: 0 },
-  topHeader: { backgroundColor: 'white', padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: '#f1f5f9', zIndex: 10 },
+  topHeader: { backgroundColor: 'white', padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: '#f1f5f9', marginTop: 20 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   toggleBtn: { marginRight: 15, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 8 },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#0f172a' },

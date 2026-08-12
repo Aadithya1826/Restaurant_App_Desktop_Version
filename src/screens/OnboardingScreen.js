@@ -252,6 +252,7 @@ const OnboardingScreen = ({ navigation }) => {
                   placeholderTextColor="#6b7280"
                   value={formData.name}
                   onChangeText={(text) => handleFormChange('name', text)}
+                  onSubmitEditing={handleAuthSubmit}
                 />
               </View>
             )}
@@ -266,6 +267,7 @@ const OnboardingScreen = ({ navigation }) => {
                 autoCapitalize="none"
                 value={formData.email}
                 onChangeText={(text) => handleFormChange('email', text)}
+                onSubmitEditing={handleAuthSubmit}
               />
             </View>
 
@@ -296,6 +298,7 @@ const OnboardingScreen = ({ navigation }) => {
                   secureTextEntry={!showPassword}
                   value={formData.password}
                   onChangeText={(text) => handleFormChange('password', text)}
+                  onSubmitEditing={handleAuthSubmit}
                 />
                 <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff color="#6b7280" size={20} /> : <Eye color="#6b7280" size={20} />}
@@ -313,6 +316,7 @@ const OnboardingScreen = ({ navigation }) => {
                   secureTextEntry={!showPassword}
                   value={formData.confirmPassword}
                   onChangeText={(text) => handleFormChange('confirmPassword', text)}
+                  onSubmitEditing={handleAuthSubmit}
                 />
               </View>
             )}
@@ -339,21 +343,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, width: '100%', height: '100%' },
   overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.55)' },
   topBannerContainer: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', zIndex: 11 },
-  bannerImage: { width: 380, height: 160 },
-  bottomBannerContainer: { position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center', zIndex: 11, pointerEvents: 'none' },
-  mascotImage: { width: 500, height: 200 },
-  scrollContent: { alignItems: 'center', justifyContent: 'center', minHeight: '100%', paddingVertical: 120 },
-  heroTitleBlock: { alignItems: 'center', marginBottom: 30 },
-  titleImage: { width: 360, height: 80, marginBottom: 10 },
-  subtitle: { fontSize: 14, color: 'rgb(202, 202, 223)', letterSpacing: 2, textTransform: 'uppercase' },
-  title: { fontSize: 28, fontWeight: '300', color: '#ffffff', marginBottom: 30, letterSpacing: 1 },
+  bannerImage: { width: 250, height: 100 },
+  bottomBannerContainer: { position: 'absolute', bottom: 10, left: 0, right: 0, alignItems: 'center', zIndex: 11, pointerEvents: 'none' },
+  mascotImage: { width: 300, height: 120 },
+  scrollContent: { alignItems: 'center', justifyContent: 'center', flexGrow: 1, paddingTop: 110, paddingBottom: 110 },
+  heroTitleBlock: { alignItems: 'center', marginBottom: 16 },
+  titleImage: { width: 260, height: 60, marginBottom: 5 },
+  subtitle: { fontSize: 12, color: 'rgb(202, 202, 223)', letterSpacing: 2, textTransform: 'uppercase' },
+  title: { fontSize: 24, fontWeight: '300', color: '#ffffff', marginBottom: 16, letterSpacing: 1 },
   roleOptions: { width: '100%', maxWidth: 500 },
   roleButton: {
     flexDirection: 'row',
     backgroundColor: 'rgba(22, 22, 22, 0.7)',
-    padding: 24,
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#404040',
@@ -366,23 +370,23 @@ const styles = StyleSheet.create({
   roleDesc: { fontSize: 13, color: '#9ca3af' },
   formContainer: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 380,
     backgroundColor: 'rgba(42, 42, 42, 0.7)',
-    padding: 40,
+    padding: 24,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#404040',
     ...(typeof document !== 'undefined' ? { backdropFilter: 'blur(10px)' } : {})
   },
-  authTitle: { textAlign: 'center', fontSize: 14, color: '#ff8c42', fontWeight: 'bold', marginBottom: 30, backgroundColor: 'rgba(255, 140, 66, 0.1)', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 140, 66, 0.3)' },
-  errorText: { color: '#ff6b6b', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 6, marginBottom: 20, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
-  successText: { color: '#2d7a4a', backgroundColor: 'rgba(45, 122, 74, 0.1)', padding: 12, borderRadius: 6, marginBottom: 20, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(45, 122, 74, 0.3)' },
-  tabsContainer: { flexDirection: 'row', marginBottom: 30, borderBottomWidth: 1, borderColor: '#404040' },
+  authTitle: { textAlign: 'center', fontSize: 14, color: '#ff8c42', fontWeight: 'bold', marginBottom: 20, backgroundColor: 'rgba(255, 140, 66, 0.1)', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 140, 66, 0.3)' },
+  errorText: { color: '#ff6b6b', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 10, borderRadius: 6, marginBottom: 16, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
+  successText: { color: '#2d7a4a', backgroundColor: 'rgba(45, 122, 74, 0.1)', padding: 10, borderRadius: 6, marginBottom: 16, textAlign: 'center', borderWidth: 1, borderColor: 'rgba(45, 122, 74, 0.3)' },
+  tabsContainer: { flexDirection: 'row', marginBottom: 20, borderBottomWidth: 1, borderColor: '#404040' },
   tab: { flex: 1, padding: 12, alignItems: 'center', borderBottomWidth: 2, borderColor: 'transparent', cursor: 'pointer' },
   activeTab: { borderColor: '#ff8c42' },
   tabText: { color: '#9ca3af', fontWeight: 'bold', fontSize: 14 },
   activeTabText: { color: '#ff8c42' },
-  inputGroup: { marginBottom: 20 },
+  inputGroup: { marginBottom: 16 },
   inputLabel: { fontSize: 14, color: '#9ca3af', fontWeight: '500', marginBottom: 8, letterSpacing: 0.5 },
   input: { borderWidth: 1, borderColor: '#404040', backgroundColor: 'rgba(15, 15, 15, 0.5)', borderRadius: 6, padding: 12, color: '#ffffff', outlineStyle: 'none' },
   pickerContainer: { borderWidth: 1, borderColor: '#404040', backgroundColor: 'rgba(15, 15, 15, 0.5)', borderRadius: 6 },
