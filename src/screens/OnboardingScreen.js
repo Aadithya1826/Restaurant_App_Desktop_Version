@@ -282,7 +282,7 @@ const OnboardingScreen = ({ navigation }) => {
                     style={styles.pickerStyle}
                   >
                     <Picker.Item label="Select a restaurant" value="" color="#6b7280" />
-                    {restaurants.map(r => <Picker.Item key={r.id} label={r.name} value={r.id} color="#ffffff" />)}
+                    {restaurants.map(r => <Picker.Item key={r.id} label={r.name} value={r.id} color="#111827" />)}
                   </Picker>
                 </View>
               </View>

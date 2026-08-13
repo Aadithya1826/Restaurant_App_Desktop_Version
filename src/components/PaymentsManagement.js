@@ -43,8 +43,8 @@ export default function PaymentsManagement() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Payments</Text>
-        <Text style={styles.subtitle}>Track all payment transactions</Text>
+        <Text style={styles.title}>{t('nav_payments')}</Text>
+        <Text style={styles.subtitle}>{t('pay_track_trans')}</Text>
       </View>
 
       {/* Stats Cards */}
@@ -61,7 +61,7 @@ export default function PaymentsManagement() {
             </View>
           </View>
           <Text style={styles.statValue}>₹{totalCollection.toLocaleString('en-IN', {minimumFractionDigits: 2})}</Text>
-          <Text style={styles.statLabel}>Overall Collection</Text>
+          <Text style={styles.statLabel}>{t('pay_overall')}</Text>
         </View>
 
         {/* UPI */}
@@ -76,7 +76,7 @@ export default function PaymentsManagement() {
             </View>
           </View>
           <Text style={styles.statValue}>₹{upiPayments.toLocaleString('en-IN', {minimumFractionDigits: 1})}</Text>
-          <Text style={styles.statLabel}>UPI Payments</Text>
+          <Text style={styles.statLabel}>{t('pay_upi_pay')}</Text>
         </View>
 
         {/* Card */}
@@ -91,7 +91,7 @@ export default function PaymentsManagement() {
             </View>
           </View>
           <Text style={styles.statValue}>₹{cardPayments.toLocaleString('en-IN', {minimumFractionDigits: 1})}</Text>
-          <Text style={styles.statLabel}>Card Payments</Text>
+          <Text style={styles.statLabel}>{t('pay_card_pay')}</Text>
         </View>
 
         {/* Cash */}
@@ -113,14 +113,14 @@ export default function PaymentsManagement() {
       {/* Transaction History */}
       <View style={styles.tableContainer}>
         <View style={styles.tableTitleContainer}>
-          <Text style={styles.tableTitle}>Transaction History</Text>
+          <Text style={styles.tableTitle}>{t('pay_trans_history')}</Text>
         </View>
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { flex: 1.5 }]}>Order</Text>
-          <Text style={[styles.th, { flex: 2 }]}>Table</Text>
+          <Text style={[styles.th, { flex: 1.5 }]}>{t('ord_order')}</Text>
+          <Text style={[styles.th, { flex: 2 }]}>{t('ord_table')}</Text>
           <Text style={[styles.th, { flex: 1.5 }]}>{t('pay_amount')}</Text>
           <Text style={[styles.th, { flex: 2 }]}>{t('pay_method')}</Text>
-          <Text style={[styles.th, { flex: 2 }]}>Time</Text>
+          <Text style={[styles.th, { flex: 2 }]}>{t('pay_time')}</Text>
           <Text style={[styles.th, { flex: 1.5 }]}>{t('ord_status')}</Text>
         </View>
         

@@ -104,7 +104,6 @@ export default function AdminDashboard({ navigation }) {
 
   const handleLogout = async () => {
     await logout();
-    navigation.replace('Login');
   };
 
   const createHotel = async () => {

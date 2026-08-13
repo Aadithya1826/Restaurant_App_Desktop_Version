@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Modal, FlatList, Image, Switch, Dimensions } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { menuService, rewriteImageUrl } from '../services/api';
 import { Plus, Edit2, Trash2, Search, Star, Minus } from 'lucide-react-native';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function MenuManagement() {
+  const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,12 +103,12 @@ export default function MenuManagement() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Menu Management</Text>
-          <Text style={styles.subtitle}>{items.length} items · {availableCount} available</Text>
+          <Text style={styles.title}>{t('menu_manage')}</Text>
+          <Text style={styles.subtitle}>{items.length} {t('menu_items_count')} · {availableCount} {t('menu_available')}</Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
           <Plus color="white" size={16} style={{ marginRight: 6 }} />
-          <Text style={styles.addBtnText}>Add Item</Text>
+          <Text style={styles.addBtnText}>{t('menu_add_item')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -114,7 +117,7 @@ export default function MenuManagement() {
         <Search color="#94a3b8" size={20} style={{ marginLeft: 16 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search menu item"
+          placeholder={t('menu_search')}
           placeholderTextColor="#94a3b8"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -124,6 +127,7 @@ export default function MenuManagement() {
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, marginBottom: 4, gap: 12 }}>
         {['All Regions', 'South Indian', 'North Indian'].map(region => {
           const val = region === 'All Regions' ? 'All' : region;
+          const displayLabel = region === 'All Regions' ? t('menu_all_regions') : region === 'South Indian' ? t('menu_south_indian') : t('menu_north_indian');
           return (
             <TouchableOpacity 
               key={region}
@@ -131,7 +135,7 @@ export default function MenuManagement() {
               onPress={() => setSelectedRegion(val)}
             >
               <Text style={[styles.regionText, selectedRegion === val && styles.regionTextActive]}>
-                {region}
+                {displayLabel}
               </Text>
             </TouchableOpacity>
           )
@@ -141,7 +145,7 @@ export default function MenuManagement() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={{ paddingRight: 20 }}>
         {['All', ...categories.filter(cat => (selectedRegion === 'All' || cat.description === selectedRegion) && items.some(item => item.category_id === cat.id)).map(c => c.name)].map(cat => (
           <TouchableOpacity key={cat} style={[styles.catBtn, activeCategory === cat && styles.activeCatBtn]} onPress={() => setActiveCategory(cat)}>
-            <Text style={[styles.catText, activeCategory === cat && styles.activeCatText]}>{cat}</Text>
+            <Text style={[styles.catText, activeCategory === cat && styles.activeCatText]}>{cat === 'All' ? t('menu_all') : cat}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -176,7 +180,7 @@ export default function MenuManagement() {
                       thumbColor="#fff"
                       style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                     />
-                    <Text style={styles.availText}>{item.is_available ? 'Avail' : 'Unavail'}</Text>
+                    <Text style={styles.availText}>{item.is_available ? t('menu_avail') : t('menu_unavail')}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
                     <TouchableOpacity onPress={() => openModal(item)}><Edit2 color="#94a3b8" size={16} /></TouchableOpacity>
@@ -185,7 +189,7 @@ export default function MenuManagement() {
                 </View>
 
                 <View style={styles.qtyContainer}>
-                  <Text style={styles.qtyLabel}>Qty:</Text>
+                  <Text style={styles.qtyLabel}>{t('menu_qty')}</Text>
                   <View style={styles.qtyControls}>
                     <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}><Minus size={14} color="#64748b" /></TouchableOpacity>
                     <TextInput style={styles.qtyInput} value={item.quantity?.toString() || '0'} editable={false} />
@@ -206,48 +210,58 @@ export default function MenuManagement() {
               <View style={styles.modalIconBg}>
                 <Plus color="white" size={20} />
               </View>
-              <Text style={styles.modalTitle}>{editingItem ? 'Edit Menu Item' : 'Add Menu Item'}</Text>
+              <Text style={styles.modalTitle}>{editingItem ? t('menu_edit') : t('menu_add_title')}</Text>
             </View>
 
             <ScrollView style={styles.modalScroll}>
-              {editingItem && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>ITEM ID / PRODUCT CODE</Text>
-                  <TextInput 
-                    style={[styles.input, { backgroundColor: '#f1f5f9', color: '#64748b' }]} 
-                    value={editingItem.id?.toString() || editingItem.product_code?.toString() || ''} 
-                    editable={false} 
-                  />
-                </View>
-              )}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>{t('menu_item_id')}</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="e.g. 666"
+                  value={newItem.item_code || newItem.product_code || ''} 
+                  onChangeText={t => setNewItem({ ...newItem, item_code: t, product_code: t })} 
+                />
+              </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>ITEM NAME</Text>
+                <Text style={styles.label}>{t('menu_item_name')}</Text>
                 <TextInput style={styles.input} placeholder="e.g. Masala Dosa" value={newItem.name} onChangeText={t => setNewItem({ ...newItem, name: t })} />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>CATEGORY</Text>
-                <TextInput style={styles.input} placeholder="Category ID" keyboardType="numeric" value={newItem.category_id.toString()} onChangeText={t => setNewItem({ ...newItem, category_id: t })} />
+                <Text style={styles.label}>{t('menu_category')}</Text>
+                <View style={[styles.input, { padding: 0, overflow: 'hidden', height: 44, justifyContent: 'center' }]}>
+                  <Picker
+                    selectedValue={newItem.category_id}
+                    onValueChange={(itemValue) => setNewItem({ ...newItem, category_id: itemValue })}
+                    style={{ width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none', paddingHorizontal: 12, fontSize: 14 }}
+                  >
+                    <Picker.Item label="Select Category" value="" />
+                    {categories.map(cat => (
+                      <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
+                    ))}
+                  </Picker>
+                </View>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>PRICE</Text>
+                <Text style={styles.label}>{t('menu_price')}</Text>
                 <TextInput style={styles.input} placeholder="INR (₹) 0.00" keyboardType="numeric" value={newItem.price.toString()} onChangeText={t => setNewItem({ ...newItem, price: t })} />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>AVAILABLE QUANTITY</Text>
+                <Text style={styles.label}>{t('menu_avail_qty')}</Text>
                 <TextInput style={styles.input} placeholder="0" keyboardType="numeric" value={newItem.quantity?.toString()} onChangeText={t => setNewItem({ ...newItem, quantity: t })} />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>DESCRIPTION</Text>
+                <Text style={styles.label}>{t('menu_desc')}</Text>
                 <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Crispy golden crepe..." value={newItem.description} onChangeText={t => setNewItem({ ...newItem, description: t })} />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>IMAGE URL (OPTIONAL)</Text>
+                <Text style={styles.label}>{t('menu_img_url')}</Text>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="https://example.com/image.jpg" value={newItem.image_url} onChangeText={t => setNewItem({ ...newItem, image_url: t })} />
                   <TouchableOpacity
@@ -268,15 +282,15 @@ export default function MenuManagement() {
                       input.click();
                     }}
                   >
-                    <Text style={styles.uploadBtnText}>Upload Image</Text>
+                    <Text style={styles.uploadBtnText}>{t('menu_upload')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </ScrollView>
 
             <View style={styles.modalFooter}>
-              <TouchableOpacity onPress={() => setIsModalOpen(false)} style={styles.cancelBtn}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity onPress={handleSaveItem} style={styles.saveBtn}><Text style={styles.saveBtnText}>{editingItem ? 'Save Changes' : '+ Add Item'}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)} style={styles.cancelBtn}><Text style={styles.cancelBtnText}>{t('menu_cancel')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={handleSaveItem} style={styles.saveBtn}><Text style={styles.saveBtnText}>{editingItem ? t('menu_save') : t('menu_add_item')}</Text></TouchableOpacity>
             </View>
           </View>
         </View>

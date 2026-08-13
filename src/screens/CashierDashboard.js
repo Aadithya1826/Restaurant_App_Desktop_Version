@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { menuService } from '../services/api';
+import { menuService, restaurantService } from '../services/api';
 import api from '../services/api';
 import { backupData } from '../services/offlineSync';
 import { LogOut, Trash2 } from 'lucide-react-native';
 import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
+import DateRangeModal from '../components/cashier/DateRangeModal';
 import { Picker } from '@react-native-picker/picker';
 
 export default function CashierDashboard({ navigation }) {
@@ -22,12 +23,19 @@ export default function CashierDashboard({ navigation }) {
   const [selectedRegion, setSelectedRegion] = useState('All');
   const [productCodeInput, setProductCodeInput] = useState('');
   const [descriptionInput, setDescriptionInput] = useState('');
+  const [lastAddedItemId, setLastAddedItemId] = useState(null);
 
-  const [billNo, setBillNo] = useState(101);
+  const [billNo, setBillNo] = useState(() => {
+    const saved = localStorage.getItem('last_bill_no');
+    return saved ? parseInt(saved) : 1;
+  });
   const [lastBillNo, setLastBillNo] = useState(0);
   const [lastBillAmt, setLastBillAmt] = useState(0);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showFutureSaleModal, setShowFutureSaleModal] = useState(false);
+  const [showDateRangeModal, setShowDateRangeModal] = useState(false);
+  const [dateRangeReportType, setDateRangeReportType] = useState('items');
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
   const [orderType, setOrderType] = useState('take-away');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -38,12 +46,32 @@ export default function CashierDashboard({ navigation }) {
   const [lastPaymentMethod, setLastPaymentMethod] = useState('');
   const [lastCart, setLastCart] = useState([]);
   const [restaurantData, setRestaurantData] = useState(null);
+  const [printFutureBills, setPrintFutureBills] = useState(false);
+
+  const productCodeRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const spacePressTimer = useRef(null);
+  const lastSpaceTime = useRef(0);
+  const cartInputRefs = useRef({});
+
+  useEffect(() => {
+    if (lastAddedItemId && cartInputRefs.current[lastAddedItemId]) {
+      setTimeout(() => {
+        cartInputRefs.current[lastAddedItemId]?.focus();
+        setLastAddedItemId(null);
+      }, 50);
+    }
+  }, [lastAddedItemId, cart]);
 
   useEffect(() => {
     if (!user || !user.restaurant_id) return;
     
-    api.get(`/api/v1/restaurants/${user.restaurant_id}`)
-      .then(data => setRestaurantData(data))
+    restaurantService.getPublicRestaurants()
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        const current = list.find(r => String(r.id) === String(user.restaurant_id));
+        if (current) setRestaurantData(current);
+      })
       .catch(err => console.error('Failed to fetch restaurant', err));
 
     menuService.getItems({ restaurant_id: user.restaurant_id })
@@ -65,20 +93,148 @@ export default function CashierDashboard({ navigation }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        // Only trigger if focus is not in an input, OR if we want it to trigger anyway.
-        // Actually, if they are in the search input, onSubmitEditing handles it.
-        // But if they are just focused on the body, this handles it.
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-          if (cart.length > 0 && !showInvoice && !showFutureSaleModal) {
-            handleCheckout();
+      if (e.altKey && e.key === '7') {
+        e.preventDefault();
+        setOrderType('take-away');
+      }
+      if (e.altKey && e.key === '8') {
+        e.preventDefault();
+        setOrderType('dine-in');
+      }
+      if (e.key === 'F1') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOrderType(prev => prev === 'dine-in' ? 'take-away' : 'dine-in');
+      }
+      if (e.key === 'F5') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowFutureSaleModal(true);
+      }
+      if (e.key === 'F2') {
+        e.preventDefault();
+        e.stopPropagation();
+        setCart(prev => prev.length > 0 ? prev.slice(0, prev.length - 1) : []);
+      }
+      if (e.key === 'F3') {
+        e.preventDefault();
+        e.stopPropagation();
+        setCart([]);
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        e.stopPropagation();
+        setPrintFutureBills(prev => !prev);
+      }
+      if (e.key === 'F10') {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePrintReport('hourly');
+      }
+      if (e.key === 'F11') {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePrintReport('items');
+      }
+      if (e.key === 'F12') {
+        e.preventDefault();
+        e.stopPropagation();
+        setDateRangeReportType('items');
+        setShowDateRangeModal(true);
+      }
+
+      const activeEl = document.activeElement;
+      let currentZone = activeEl && activeEl.dataset ? parseInt(activeEl.dataset.zone) : NaN;
+      let currentIndex = activeEl && activeEl.dataset ? parseInt(activeEl.dataset.index) : NaN;
+
+      if (productCodeRef.current?.isFocused()) { currentZone = 1; currentIndex = 0; }
+      else if (descriptionRef.current?.isFocused()) { currentZone = 2; currentIndex = 0; }
+      else if (activeEl && activeEl.tagName === 'SELECT') { currentZone = 0; currentIndex = 0; }
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!isNaN(currentZone)) {
+          e.preventDefault();
+          let targetZone = e.key === 'ArrowDown' ? currentZone + 1 : currentZone - 1;
+          let targetIndex = 0;
+
+          if (currentZone === 5 && targetZone === 6) targetZone = 5; // clamp bottom
+          
+          if (currentZone === 5 && targetZone === 5) {
+             targetIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+             if (targetIndex < 0) {
+               targetZone = 4;
+               targetIndex = 0;
+             }
           }
+
+          if (targetZone === 0) {
+             const selectEl = document.querySelector('select');
+             if (selectEl) selectEl.focus();
+          } else if (targetZone === 1) {
+             productCodeRef.current?.focus();
+          } else if (targetZone === 2) {
+             descriptionRef.current?.focus();
+          } else {
+             let targetElement = document.querySelector(`[data-zone="${targetZone}"][data-index="${targetIndex}"]`);
+             if (!targetElement) targetElement = document.querySelector(`[data-zone="${targetZone}"][data-index="0"]`);
+             if (targetElement) targetElement.focus();
+          }
+        } else if (isNaN(currentZone) && e.key === 'ArrowDown') {
+          // If body is focused, start from zone 1
+          e.preventDefault();
+          productCodeRef.current?.focus();
+        }
+      }
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (!isNaN(currentZone) && currentZone >= 3 && activeEl.tagName !== 'SELECT') {
+          e.preventDefault();
+          let targetIndex = e.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1;
+          let targetElement = document.querySelector(`[data-zone="${currentZone}"][data-index="${targetIndex}"]`);
+          if (targetElement) targetElement.focus();
+        }
+      }
+
+      if (e.key === ' ') {
+        if (showFutureSaleModal || showInvoice) return;
+        const activeEl = document.activeElement;
+        const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const isSearchItem = isInput && activeEl.placeholder === t("cashier_search_item");
+        
+        if (!isInput || !isSearchItem) {
+          e.preventDefault();
+          e.stopPropagation();
+          const now = Date.now();
+          if (now - lastSpaceTime.current < 400) {
+            clearTimeout(spacePressTimer.current);
+            lastSpaceTime.current = 0;
+            if (cart.length > 0 && !showInvoice && !showFutureSaleModal) {
+              setShowFutureSaleModal(true);
+            }
+          } else {
+            lastSpaceTime.current = now;
+            spacePressTimer.current = setTimeout(() => {
+              if (lastSpaceTime.current === now) {
+                if (cart.length > 0 && !showInvoice && !showFutureSaleModal) {
+                  handleCheckout();
+                }
+                lastSpaceTime.current = 0;
+              }
+            }, 400);
+          }
+        }
+      }
+
+      if (e.key === 'Enter') {
+        if (activeEl && activeEl.tagName === 'SELECT') {
+          e.preventDefault();
+          productCodeRef.current?.focus();
         }
       }
     };
     if (Platform.OS === 'web') {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', handleKeyDown, true);
+      return () => window.removeEventListener('keydown', handleKeyDown, true);
     }
   }, [cart, showInvoice, showFutureSaleModal, orderType, paymentMethod, futureSale]);
 
@@ -94,9 +250,18 @@ export default function CashierDashboard({ navigation }) {
         description: item.name || 'Unknown',
         rate: item.price || 0,
         qty: 1,
-        amount: item.price || 0
+        amount: item.price || 0,
+        category_id: item.category_id
       }];
     });
+    setLastAddedItemId(item.id);
+  };
+
+  const handleQtyTextChange = (id, val) => {
+    const num = parseInt(val);
+    if (!isNaN(num) && num > 0) {
+      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: num, amount: num * item.rate } : item));
+    }
   };
 
   const addProductToCart = () => {
@@ -143,7 +308,11 @@ export default function CashierDashboard({ navigation }) {
 
     setLastBillNo(billNo);
     setLastBillAmt(totalAmt);
-    setBillNo(prev => prev + 1);
+    setBillNo(prev => {
+      const next = prev + 1;
+      localStorage.setItem('last_bill_no', next.toString());
+      return next;
+    });
     setLastCart([...cart]);
     setCart([]);
     setLastOrderType(orderType);
@@ -170,6 +339,94 @@ export default function CashierDashboard({ navigation }) {
       const resAddr = restaurantData?.address || 'M G R Nagar, Chennai';
       const resPhone = restaurantData?.phone || '31595014';
 
+      const tandooriItems = cart.filter(item => {
+        if (item.description.toLowerCase().includes('tandoori')) return true;
+        const cat = categories.find(c => c.id === item.category_id);
+        if (cat && cat.name.toLowerCase().includes('tandoori')) return true;
+        return false;
+      });
+      
+      let kotHtml = '';
+      if (tandooriItems.length > 0) {
+        const kotRows = tandooriItems.map(item => `
+          <div class="row">
+            <div class="item-name">${item.description}</div>
+            <div class="item-qty">${item.qty}</div>
+          </div>
+        `).join('');
+        
+        kotHtml = `
+          <div class="center">
+            <h1>KOT</h1>
+            <div class="bold" style="margin-top: 5px;">TANDOORI SECTION</div>
+          </div>
+          <div class="divider"></div>
+          <div class="row">
+            <span class="bold">Bill No: ${billNo}</span>
+            <span>${currentDate}</span>
+          </div>
+          <div>
+            <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'}
+          </div>
+          <div class="divider"></div>
+          <div class="row bold">
+            <div class="item-name">Item</div>
+            <div class="item-qty">Qty</div>
+          </div>
+          <div class="divider"></div>
+          ${kotRows}
+          <div class="divider"></div>
+          <div style="page-break-after: always;"></div>
+        `;
+      }
+
+      const billHtml = `
+            <div class="center">
+              <h1>${resName}</h1>
+              <div>${resAddr}</div>
+              <div>Phone: ${resPhone}</div>
+              <div class="bold" style="margin-top: 5px;">COUNTER POS</div>
+            </div>
+            <div class="divider"></div>
+            <div class="row">
+              <span class="bold">Bill No: ${billNo}</span>
+              <span>${currentDate}</span>
+            </div>
+            <div>
+              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'} | 
+              <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
+            </div>
+            ${futureSale.name ? `<div><span class="bold">Future Sale:</span> ${futureSale.name}</div>` : ''}
+            ${futureSale.phone ? `<div><span class="bold">Phone:</span> ${futureSale.phone}</div>` : ''}
+            ${futureSale.address ? `<div><span class="bold">Address:</span> ${futureSale.address}</div>` : ''}
+            ${futureSale.deliveryDate ? `<div><span class="bold">Del. Date:</span> ${futureSale.deliveryDate}</div>` : ''}
+            <div class="divider"></div>
+            <div class="row bold">
+              <div class="item-name">Item</div>
+              <div class="item-qty">Qty</div>
+              <div class="item-amt">Amt</div>
+            </div>
+            <div class="divider"></div>
+            ${itemRows}
+            <div class="divider"></div>
+            <div class="row bold" style="font-size: 14px;">
+              <span>TOTAL</span>
+              <span>₹${totalAmt.toFixed(2)}</span>
+            </div>
+            <div class="divider"></div>
+            <div class="center" style="margin-top: 10px;">Thank you! Visit again.</div>
+            <div class="center" style="margin-top: 10px; font-size: 10px;">Techwizard AI partners<br/>hello@t-wi.com</div>
+      `;
+
+      let finalBodyHtml = kotHtml + billHtml;
+      if (printFutureBills) {
+        finalBodyHtml += `
+            <div style="page-break-after: always;"></div>
+            <div class="center bold" style="font-size: 14px; margin-bottom: 10px;">HOTEL COPY</div>
+            ${billHtml}
+        `;
+      }
+
       const html = `
         <html>
           <head>
@@ -187,38 +444,7 @@ export default function CashierDashboard({ navigation }) {
             </style>
           </head>
           <body>
-            <div class="center">
-              <h1>${resName}</h1>
-              <div>${resAddr}</div>
-              <div>Phone: ${resPhone}</div>
-              <div class="bold" style="margin-top: 5px;">COUNTER POS</div>
-            </div>
-            <div class="divider"></div>
-            <div class="row">
-              <span class="bold">Bill No: ${billNo}</span>
-              <span>${currentDate}</span>
-            </div>
-            <div>
-              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'} | 
-              <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
-            </div>
-            ${futureSale.name ? `<div>Future Sale: ${futureSale.name}</div>` : ''}
-            <div class="divider"></div>
-            <div class="row bold">
-              <div class="item-name">Item</div>
-              <div class="item-qty">Qty</div>
-              <div class="item-amt">Amt</div>
-            </div>
-            <div class="divider"></div>
-            ${itemRows}
-            <div class="divider"></div>
-            <div class="row bold" style="font-size: 14px;">
-              <span>TOTAL</span>
-              <span>₹${totalAmt.toFixed(2)}</span>
-            </div>
-            <div class="divider"></div>
-            <div class="center" style="margin-top: 10px;">Thank you! Visit again.</div>
-            <div class="center" style="margin-top: 10px; font-size: 10px;">Techwizard AI partners<br/>vasu@t-wi.com</div>
+            ${finalBodyHtml}
           </body>
         </html>
       `;
@@ -237,9 +463,109 @@ export default function CashierDashboard({ navigation }) {
     }
   };
 
+  const handlePrintReport = async (type, startDate, endDate) => {
+    try {
+      let data;
+      let params = `restaurant_id=${user?.restaurant_id || ''}`;
+      if (startDate && endDate) {
+          params += `&start_date=${startDate}&end_date=${endDate}`;
+      }
+      if (type === 'hourly') {
+        const res = await api.get(`/api/v1/reports/hourly?${params}`);
+        data = res.data;
+      } else {
+        const res = await api.get(`/api/v1/reports/items?${params}`);
+        data = res.data;
+      }
+
+      let tableRows = '';
+      if (type === 'hourly') {
+        tableRows = (data.timeline || []).map(t => `
+          <div class="row">
+            <span>${t.time}</span>
+            <span>${Math.round(t.sales)}</span>
+          </div>
+        `).join('');
+      } else {
+        tableRows = (data.items || []).map(item => `
+          <div class="item-row">
+            <span class="item-name">${item.name}</span>
+            <span class="item-qty">${item.qty.toFixed(2)}</span>
+            <span class="item-amt">${item.amount.toFixed(2)}</span>
+          </div>
+        `).join('');
+      }
+
+      const itemHeader = type === 'hourly' ? '' : `
+        <div class="item-row" style="border-bottom: 1px dashed #000; border-top: 1px dashed #000; padding: 5px 0; margin-bottom: 5px; font-weight: bold;">
+          <span class="item-name">Item Name</span>
+          <span class="item-qty">Qty</span>
+          <span class="item-amt">Amount</span>
+        </div>
+      `;
+
+      const printContent = `
+        <html>
+          <head>
+            <title>Print Receipt</title>
+            <style>
+              @page { margin: 0; }
+              body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; width: 72mm; box-sizing: border-box; color: #000; }
+              .header { text-align: center; margin-bottom: 10px; }
+              .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; }
+              .header p { margin: 0 0 4px 0; text-transform: uppercase; }
+              .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+              .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+              .item-name { flex: 2; word-break: break-word; padding-right: 5px; }
+              .item-qty { flex: 1; text-align: right; }
+              .item-amt { flex: 1; text-align: right; }
+              .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>${(data.restaurant && data.restaurant.name) || 'DATAUDIPI HOTEL'}</h1>
+              <p>${(data.restaurant && data.restaurant.address) || 'MUGALIVAKKAM, CHENNAI'}</p>
+              <p>PH:${(data.restaurant && data.restaurant.phone) || '9597066563'} GSTIN: ${(data.restaurant && data.restaurant.gstin) || '33ADLPV4810B3ZQ'}</p>
+              <h2 style="font-size: 14px; margin: 10px 0 5px 0;">${type === 'hourly' ? 'HOURLY REPORT' : 'ITEM WISE REPORT'}</h2>
+              <div style="text-align: left; margin-top: 10px;">
+                ${type === 'hourly' 
+                  ? `<p>Date: ${data.date}</p>` 
+                  : `<p>Print Date: ${data.date}</p><p>Bills From: ${data.date}</p><p>To: ${data.date}</p>`}
+                <p>Starting BillNo: ${(data.starting_bill && data.starting_bill.no) || '-'} - ${(data.starting_bill && data.starting_bill.time) || '-'}</p>
+                <p>Ending BillNo: ${(data.ending_bill && data.ending_bill.no) || '-'} - ${(data.ending_bill && data.ending_bill.time) || '-'}</p>
+              </div>
+            </div>
+            
+            ${itemHeader}
+            ${tableRows}
+            
+            <div class="total-row">
+              <span>TOTAL SALES</span>
+              <span>${data.total_sales ? data.total_sales.toFixed(2) : '0.00'}</span>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      iframe.contentWindow.document.open();
+      iframe.contentWindow.document.write(printContent);
+      iframe.contentWindow.document.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        document.body.removeChild(iframe);
+      }, 500);
+    } catch (e) {
+      alert("Failed to print report.");
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
-    navigation.replace('Login');
   };
 
   const filteredItems = menuItems.filter(item => {
@@ -295,35 +621,48 @@ export default function CashierDashboard({ navigation }) {
         <View style={[styles.leftPanel, { flex: isTablet ? 7 : 1 }]}>
 
           <View style={styles.inputStack}>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker}>
-                <Picker.Item label="[7] Take Away" value="take-away" />
-                <Picker.Item label="[8] Dine In" value="dine-in" />
-              </Picker>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker} dataSet={{ zone: '0', index: '0' }}>
+                  <Picker.Item label="[7] Take Away" value="take-away" />
+                  <Picker.Item label="[8] Dine In" value="dine-in" />
+                </Picker>
+              </View>
+              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('hourly')}>
+                <Text style={styles.reportBtnText}>Hourly Report</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('items')}>
+                <Text style={styles.reportBtnText}>Item Report</Text>
+              </TouchableOpacity>
             </View>
             <TextInput
+              ref={productCodeRef}
               style={styles.searchInput}
               placeholder={t("cashier_search_code")}
               value={productCodeInput}
               onChangeText={setProductCodeInput}
               onSubmitEditing={addProductToCart}
+              dataSet={{ zone: '1', index: '0' }}
             />
             <TextInput
+              ref={descriptionRef}
               style={styles.searchInput}
               placeholder={t("cashier_search_item")}
               value={descriptionInput}
               onChangeText={setDescriptionInput}
+              dataSet={{ zone: '2', index: '0' }}
             />
           </View>
 
           <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, marginBottom: 4, gap: 12 }}>
-            {['All Regions', 'South Indian', 'North Indian'].map(region => {
+            {['All Regions', 'South Indian', 'North Indian'].map((region, idx) => {
               const val = region === 'All Regions' ? 'All' : region;
               return (
                 <TouchableOpacity 
                   key={region}
                   style={[styles.regionBtn, selectedRegion === val && styles.regionBtnActive]}
                   onPress={() => setSelectedRegion(val)}
+                  dataSet={{ zone: '3', index: String(idx), hover: 'btn' }}
                 >
                   <Text style={[styles.regionText, selectedRegion === val && styles.regionTextActive]}>
                     {region}
@@ -334,13 +673,13 @@ export default function CashierDashboard({ navigation }) {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContainer}>
-            <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')} dataSet={{ hover: 'btn' }}>
+            <TouchableOpacity style={[styles.catBtn, selectedCategoryId === 'All' && styles.catBtnActive]} onPress={() => setSelectedCategoryId('All')} dataSet={{ zone: '4', index: '0', hover: 'btn' }}>
               <Text style={[styles.catText, selectedCategoryId === 'All' && styles.catTextActive]}>All</Text>
             </TouchableOpacity>
             {categories
               .filter(cat => (selectedRegion === 'All' || cat.description === selectedRegion) && menuItems.some(item => item.category_id === cat.id))
-              .map(cat => (
-              <TouchableOpacity key={cat.id} style={[styles.catBtn, selectedCategoryId === cat.id && styles.catBtnActive]} onPress={() => setSelectedCategoryId(cat.id)} dataSet={{ hover: 'btn' }}>
+              .map((cat, idx) => (
+              <TouchableOpacity key={cat.id} style={[styles.catBtn, selectedCategoryId === cat.id && styles.catBtnActive]} onPress={() => setSelectedCategoryId(cat.id)} dataSet={{ zone: '4', index: String(idx + 1), hover: 'btn' }}>
                 <Text style={[styles.catText, selectedCategoryId === cat.id && styles.catTextActive]}>{cat.name}</Text>
               </TouchableOpacity>
             ))}
@@ -358,13 +697,13 @@ export default function CashierDashboard({ navigation }) {
               showsVerticalScrollIndicator={false}
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item }) => (
+              renderItem={({ item, index }) => (
                 <View style={styles.tableRow} dataSet={{ hover: 'nav' }}>
                   <Text style={[styles.tdCode, { width: 80 }]}>{item.item_code || item.id}</Text>
                   <Text style={[styles.tdName, { flex: 1 }]}>{item.name}</Text>
                   <View style={{ width: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
                     <Text style={styles.tdPrice}>₹{(item.price || 0).toFixed(2)}</Text>
-                    <TouchableOpacity style={styles.addSquareBtn} onPress={() => addItemToCart(item)} dataSet={{ hover: 'btn' }}>
+                    <TouchableOpacity style={styles.addSquareBtn} onPress={() => addItemToCart(item)} dataSet={{ zone: '5', index: String(index), hover: 'btn' }}>
                       <Text style={styles.addSquareText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -397,7 +736,15 @@ export default function CashierDashboard({ navigation }) {
                 </View>
                 <View style={styles.cartRowControls}>
                   <TouchableOpacity style={styles.cartQtyBtn} onPress={() => updateQty(item.id, -1)}><Text>-</Text></TouchableOpacity>
-                  <Text style={styles.cartQtyText}>{item.qty}</Text>
+                  <TextInput
+                    ref={el => cartInputRefs.current[item.id] = el}
+                    style={styles.cartQtyInput}
+                    value={String(item.qty)}
+                    onChangeText={val => handleQtyTextChange(item.id, val)}
+                    onSubmitEditing={() => productCodeRef.current?.focus()}
+                    keyboardType="numeric"
+                    selectTextOnFocus={true}
+                  />
                   <TouchableOpacity style={styles.cartQtyBtn} onPress={() => updateQty(item.id, 1)}><Text>+</Text></TouchableOpacity>
                 </View>
                 <Text style={styles.cartRowTotal}>₹{item.amount.toFixed(2)}</Text>
@@ -406,9 +753,21 @@ export default function CashierDashboard({ navigation }) {
           />
 
           <View style={styles.cartFooterArea}>
-            <TouchableOpacity style={styles.futureSaleLightBtn} onPress={() => setShowFutureSaleModal(true)} dataSet={{ hover: 'btn' }}>
-              <Text style={styles.futureSaleLightText}>+ Future Sale</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <TouchableOpacity style={styles.futureSaleLightBtn} onPress={() => setShowFutureSaleModal(true)} dataSet={{ hover: 'btn' }}>
+                <Text style={styles.futureSaleLightText}>+ Future Sale</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer' }}
+                onPress={() => setPrintFutureBills(!printFutureBills)}
+              >
+                <View style={{ width: 16, height: 16, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4, marginRight: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: printFutureBills ? '#111827' : '#fff' }}>
+                  {printFutureBills && <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
+                </View>
+                <Text style={{ fontSize: 13, color: '#4b5563', fontWeight: '500' }}>[F4] Future Bills</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.subtotalRow}>
               <Text style={styles.subtotalLabel}>{t('cashier_subtotal')}</Text>
               <Text style={styles.subtotalValue}>₹{totalAmount.toFixed(2)}</Text>
@@ -436,6 +795,18 @@ export default function CashierDashboard({ navigation }) {
         restaurantData={restaurantData}
       />
       <FutureSaleModal show={showFutureSaleModal} setShow={setShowFutureSaleModal} futureSale={futureSale} setFutureSale={setFutureSale} />
+      
+      {showDateRangeModal && (
+        <DateRangeModal
+          show={showDateRangeModal}
+          setShow={setShowDateRangeModal}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          onPrint={handlePrintReport}
+          reportType={dateRangeReportType}
+          setDateRangeReportType={setDateRangeReportType}
+        />
+      )}
     </View>
   );
 }
@@ -459,7 +830,9 @@ const styles = StyleSheet.create({
   leftPanel: { flex: 7, backgroundColor: '#ffffff', paddingHorizontal: 32, paddingTop: 24, paddingBottom: 0, borderRightWidth: 1, borderColor: '#e5e7eb', minHeight: 0 },
 
   inputStack: { gap: 16, marginBottom: 24 },
-  pickerWrapper: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, backgroundColor: '#fff', height: 48, justifyContent: 'center', width: '30%' },
+  pickerWrapper: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, backgroundColor: '#fff', height: 48, justifyContent: 'center', width: 160 },
+  reportBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0' },
+  reportBtnText: { color: '#475569', fontSize: 13, fontWeight: '600' },
   picker: { height: 48, borderWidth: 0, outlineStyle: 'none', backgroundColor: 'transparent', paddingHorizontal: 16 },
   searchInput: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 16, fontSize: 14, backgroundColor: '#fff', outlineStyle: 'none' },
 
@@ -496,6 +869,7 @@ const styles = StyleSheet.create({
   cartRowControls: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 4, marginRight: 16 },
   cartQtyBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   cartQtyText: { fontSize: 14, fontWeight: '500', minWidth: 20, textAlign: 'center' },
+  cartQtyInput: { fontSize: 14, fontWeight: '500', width: 40, textAlign: 'center', outlineStyle: 'none' },
   cartRowTotal: { fontSize: 13, color: '#6b7280', width: 60, textAlign: 'right' },
 
   cartFooterArea: { padding: 24, borderTopWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },

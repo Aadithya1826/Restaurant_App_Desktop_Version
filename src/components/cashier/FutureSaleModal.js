@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
 const FutureSaleModal = ({ show, setShow, futureSale, setFutureSale }) => {
   return (
@@ -25,12 +25,32 @@ const FutureSaleModal = ({ show, setShow, futureSale, setFutureSale }) => {
             value={futureSale.address}
             onChangeText={(text) => setFutureSale(prev => ({ ...prev, address: text }))}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Delivery Date (YYYY-MM-DD)"
-            value={futureSale.deliveryDate}
-            onChangeText={(text) => setFutureSale(prev => ({ ...prev, deliveryDate: text }))}
-          />
+          {Platform.OS === 'web' ? (
+            <input
+              type="date"
+              style={{
+                borderWidth: '1px',
+                borderColor: '#ccc',
+                borderStyle: 'solid',
+                borderRadius: '5px',
+                padding: '10px',
+                marginBottom: '10px',
+                width: '100%',
+                boxSizing: 'border-box',
+                fontSize: '14px',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+              }}
+              value={futureSale.deliveryDate || ''}
+              onChange={(e) => setFutureSale(prev => ({ ...prev, deliveryDate: e.target.value }))}
+            />
+          ) : (
+            <TextInput
+              style={styles.input}
+              placeholder="Delivery Date (YYYY-MM-DD)"
+              value={futureSale.deliveryDate}
+              onChangeText={(text) => setFutureSale(prev => ({ ...prev, deliveryDate: text }))}
+            />
+          )}
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.cancelButton} onPress={() => setShow(false)}>
               <Text>Cancel</Text>

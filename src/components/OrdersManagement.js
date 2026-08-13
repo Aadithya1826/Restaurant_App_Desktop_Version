@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, Modal } from 'react-native';
 import { orderService } from '../services/api';
 import { Clock, ChefHat, CheckCircle2, Truck, MoreHorizontal } from 'lucide-react-native';
 
 const TABS = [
-  { id: 'PENDING', title: 'New Orders', icon: Clock, color: '#ff8c42' },
-  { id: 'PREPARING', title: 'Preparing', icon: ChefHat, color: '#eab308' },
-  { id: 'READY', title: 'Ready to Serve', titleTakeaway: 'Ready to pickup', icon: CheckCircle2, color: '#2d7a4a' },
-  { id: 'SERVED', title: 'Served', titleTakeaway: 'Picked up', icon: Truck, color: '#64748b' },
+  { id: 'PENDING', titleKey: 'ord_new_orders', icon: Clock, color: '#ff8c42' },
+  { id: 'PREPARING', titleKey: 'ord_preparing', icon: ChefHat, color: '#eab308' },
+  { id: 'READY', titleKey: 'ord_ready', titleTakeawayKey: 'ord_ready', icon: CheckCircle2, color: '#2d7a4a' },
+  { id: 'SERVED', titleKey: 'ord_served', titleTakeawayKey: 'ord_served', icon: Truck, color: '#64748b' },
 ];
 
 export default function OrdersManagement() {
@@ -16,6 +16,7 @@ export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderMode, setOrderMode] = useState('DINE_IN'); // 'DINE_IN' or 'TAKEAWAY'
+  const [selectedKOTOrder, setSelectedKOTOrder] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -77,7 +78,7 @@ export default function OrdersManagement() {
     });
 
     const Icon = tab.icon;
-    const title = orderMode === 'TAKEAWAY' && tab.titleTakeaway ? tab.titleTakeaway : tab.title;
+    const title = orderMode === 'TAKEAWAY' && tab.titleTakeawayKey ? t(tab.titleTakeawayKey) : t(tab.titleKey);
 
     return (
       <View key={tab.id} style={styles.column}>
@@ -99,8 +100,8 @@ export default function OrdersManagement() {
                                item.status === 'PREPARING' ? 'READY' : 
                                item.status === 'READY' ? (orderMode === 'TAKEAWAY' ? 'PICKED_UP' : 'SERVED') : null;
             
-            const actionText = nextStatus === 'PREPARING' ? 'Start Preparing' : 
-                               nextStatus === 'READY' ? 'Mark Ready' : 
+            const actionText = nextStatus === 'PREPARING' ? t('ord_start_prep') : 
+                               nextStatus === 'READY' ? t('ord_mark_ready') : 
                                nextStatus === 'PICKED_UP' ? 'Mark Picked up' : 
                                nextStatus === 'SERVED' ? 'Mark Served' : null;
 
@@ -121,8 +122,8 @@ export default function OrdersManagement() {
                 </View>
                 
                 <View style={styles.actions}>
-                  <TouchableOpacity style={styles.detailsBtn}>
-                    <Text style={styles.detailsBtnText}>Details</Text>
+                  <TouchableOpacity style={styles.detailsBtn} onPress={() => setSelectedKOTOrder(item)}>
+                    <Text style={styles.detailsBtnText}>{t('ord_details')}</Text>
                   </TouchableOpacity>
                   {actionText && (
                     <TouchableOpacity style={styles.primaryActionBtn} onPress={() => updateStatus(item.order_id, nextStatus)}>
@@ -132,13 +133,13 @@ export default function OrdersManagement() {
                 </View>
                 
                 <View style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>Payment (Cash):</Text>
+                  <Text style={styles.paymentLabel}>{t('ord_payment')} (Cash):</Text>
                   <View style={styles.paymentStatus}>
                     <View style={[styles.checkbox, item.payment_status === 'PAID' ? styles.checkboxPaid : null]}>
                       {item.payment_status === 'PAID' && <CheckCircle2 size={10} color="white" />}
                     </View>
                     <Text style={[styles.paymentStatusText, item.payment_status === 'PAID' && styles.paymentStatusPaid]}>
-                      {item.payment_status === 'PAID' ? 'Paid' : 'Pending'}
+                      {item.payment_status === 'PAID' ? 'Paid' : t('ord_pending')}
                     </Text>
                   </View>
                 </View>
@@ -155,8 +156,8 @@ export default function OrdersManagement() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Live Orders (KDS)</Text>
-          <Text style={styles.subtitle}>Kitchen Display System — Real-time order tracking</Text>
+          <Text style={styles.title}>{t('ord_live_kds')}</Text>
+          <Text style={styles.subtitle}>{t('ord_kds_desc')}</Text>
         </View>
         <View style={styles.activeOrdersPill}>
           <View style={styles.greenDot} />
@@ -171,7 +172,7 @@ export default function OrdersManagement() {
             style={[styles.toggleBtn, orderMode === 'DINE_IN' && styles.activeToggleBtn]} 
             onPress={() => setOrderMode('DINE_IN')}
           >
-            <Text style={[styles.toggleText, orderMode === 'DINE_IN' && styles.activeToggleText]}>Dine-In</Text>
+            <Text style={[styles.toggleText, orderMode === 'DINE_IN' && styles.activeToggleText]}>{t('ord_dine_in')}</Text>
             {dineInOrders.length > 0 && orderMode !== 'DINE_IN' && (
               <View style={styles.toggleBadge}><Text style={styles.toggleBadgeText}>{dineInOrders.length}</Text></View>
             )}
@@ -181,7 +182,7 @@ export default function OrdersManagement() {
             style={[styles.toggleBtn, orderMode === 'TAKEAWAY' && styles.activeToggleBtn]} 
             onPress={() => setOrderMode('TAKEAWAY')}
           >
-            <Text style={[styles.toggleText, orderMode === 'TAKEAWAY' && styles.activeToggleText]}>Takeaway</Text>
+            <Text style={[styles.toggleText, orderMode === 'TAKEAWAY' && styles.activeToggleText]}>{t('ord_takeaway')}</Text>
             {takeawayOrders.length > 0 && orderMode !== 'TAKEAWAY' && (
               <View style={styles.toggleBadge}><Text style={styles.toggleBadgeText}>{takeawayOrders.length}</Text></View>
             )}
@@ -195,6 +196,75 @@ export default function OrdersManagement() {
           {TABS.map(tab => renderColumn(tab))}
         </View>
       )}
+
+      {/* KOT Modal */}
+      <Modal visible={!!selectedKOTOrder} transparent={true} animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setSelectedKOTOrder(null)} activeOpacity={1}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.kotHeader}>KITCHEN ORDER TICKET</Text>
+              <Text style={styles.kotSubheader}>* * * KOT * * *</Text>
+              
+              <View style={styles.dashedLine} />
+              <Text style={styles.kotLabelCenter}>Order No</Text>
+              <Text style={styles.kotOrderNo}>#{selectedKOTOrder?.order_id}</Text>
+              
+              <View style={styles.dashedLine} />
+              <View style={styles.kotRow}>
+                <Text style={styles.kotTextBold}>Date</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && new Date(selectedKOTOrder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+              </View>
+              <View style={styles.kotRow}>
+                <Text style={styles.kotTextBold}>Time</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && new Date(selectedKOTOrder.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+              </View>
+              <View style={styles.kotRow}>
+                <Text style={styles.kotTextBold}>Table</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && (!selectedKOTOrder.table_number || selectedKOTOrder.table_number === 'N/A' || selectedKOTOrder.table_number.toString().toLowerCase() === 'takeaway') ? 'Takeaway' : `T${selectedKOTOrder?.table_number?.toString().padStart(2, '0')}`}</Text>
+              </View>
+              <View style={[styles.kotRow, { marginBottom: 16 }]}>
+                <Text style={styles.kotTextBold}>Type</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && (!selectedKOTOrder.table_number || selectedKOTOrder.table_number === 'N/A' || selectedKOTOrder.table_number.toString().toLowerCase() === 'takeaway') ? 'Takeaway' : 'Dine-In'}</Text>
+              </View>
+
+              <View style={styles.dashedLine} />
+              <View style={[styles.kotRow, { marginBottom: 8 }]}>
+                <Text style={[styles.kotTextBold, { width: 40 }]}>QTY</Text>
+                <Text style={styles.kotTextBold}>ITEM</Text>
+              </View>
+              <View style={styles.dashedLine} />
+              
+              <View style={{ marginBottom: 16 }}>
+                {selectedKOTOrder?.items?.length > 0 ? (
+                  selectedKOTOrder.items.map((item, idx) => (
+                    <View key={idx} style={[styles.kotRow, { justifyContent: 'flex-start', marginBottom: 6 }]}>
+                      <Text style={[styles.kotTextBold, { width: 40 }]}>{item.quantity}</Text>
+                      <Text style={styles.kotTextBold}>{item.item_name?.toUpperCase() || item.name?.toUpperCase() || `ITEM #${item.item_id}`}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={[styles.kotText, { fontStyle: 'italic', color: '#666' }]}>No items found</Text>
+                )}
+              </View>
+
+              {selectedKOTOrder?.notes && (
+                <>
+                  <View style={styles.dashedLine} />
+                  <Text style={[styles.kotTextBold, { marginBottom: 4 }]}>Special Note:</Text>
+                  <Text style={[styles.kotText, { fontStyle: 'italic', marginBottom: 16 }]}>{selectedKOTOrder.notes}</Text>
+                </>
+              )}
+              
+              <View style={styles.dashedLine} />
+              <Text style={[styles.kotTextBold, { textAlign: 'center', marginTop: 16 }]}>* * * END OF TICKET * * *</Text>
+              
+              <TouchableOpacity style={styles.kotCloseBtn} onPress={() => setSelectedKOTOrder(null)}>
+                <Text style={styles.kotCloseBtnText}>Close Details</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -250,5 +320,18 @@ const styles = StyleSheet.create({
   checkbox: { width: 14, height: 14, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 4, marginRight: 6, alignItems: 'center', justifyContent: 'center' },
   checkboxPaid: { backgroundColor: '#38bdf8', borderColor: '#38bdf8' },
   paymentStatusText: { color: '#ff8c42', fontSize: 12, fontWeight: '600' },
-  paymentStatusPaid: { color: '#38bdf8' }
+  paymentStatusPaid: { color: '#38bdf8' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  modalContent: { backgroundColor: '#f8f9fa', padding: 24, borderRadius: 8, maxWidth: 360, width: '100%', maxHeight: '90%', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20 },
+  kotHeader: { textAlign: 'center', fontWeight: 'bold', fontSize: 16, letterSpacing: 2, marginBottom: 8, color: 'black', fontFamily: 'monospace' },
+  kotSubheader: { textAlign: 'center', fontWeight: 'bold', fontSize: 14, letterSpacing: 4, marginBottom: 16, color: 'black', fontFamily: 'monospace' },
+  dashedLine: { height: 1, borderTopWidth: 1, borderTopColor: '#aaa', borderStyle: 'dashed', marginVertical: 12 },
+  kotLabelCenter: { textAlign: 'center', fontWeight: 'bold', fontSize: 14, marginBottom: 4, color: 'black', fontFamily: 'monospace' },
+  kotOrderNo: { textAlign: 'center', fontWeight: 'bold', fontSize: 36, marginBottom: 16, color: 'black', fontFamily: 'monospace' },
+  kotRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  kotTextBold: { fontSize: 13, fontWeight: 'bold', color: 'black', fontFamily: 'monospace' },
+  kotText: { fontSize: 13, fontWeight: 'normal', color: 'black', fontFamily: 'monospace' },
+  kotCloseBtn: { marginTop: 24, padding: 12, backgroundColor: '#e0e0e0', borderRadius: 4, alignItems: 'center' },
+  kotCloseBtnText: { fontWeight: 'bold', color: 'black', fontFamily: 'sans-serif' }
 });

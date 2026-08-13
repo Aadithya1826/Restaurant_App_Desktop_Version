@@ -68,7 +68,6 @@ export default function HotelManagerDashboard({ navigation }) {
 
   const handleLogout = async () => {
     await logout();
-    navigation.replace('Login');
   };
 
   const getActiveOrders = () => orders.filter(o => o.status !== 'COMPLETED' && o.status !== 'SERVED' && o.status !== 'PICKED_UP').length;

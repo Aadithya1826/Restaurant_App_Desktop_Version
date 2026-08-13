@@ -92,7 +92,7 @@ const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMet
 
             <View style={styles.centerAlign}>
               <Text style={styles.footerGray}>Techwizard AI partners</Text>
-              <Text style={styles.footerGray}>vasu@t-wi.com</Text>
+              <Text style={styles.footerGray}>hello@t-wi.com</Text>
             </View>
 
           </ScrollView>

@@ -73,13 +73,13 @@ export default function TableManagement() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Tables & QR Management</Text>
-          <Text style={styles.subtitle}>{occupiedCount} occupied · {vacantCount} vacant · {reservedCount} reserved · {total} total</Text>
+          <Text style={styles.title}>{t('tbl_qr_manage')}</Text>
+          <Text style={styles.subtitle}>{occupiedCount} {t('tbl_occupied_sm')} · {vacantCount} {t('tbl_vacant_sm')} · {reservedCount} {t('tbl_reserved_sm')} · {total} {t('tbl_total_sm')}</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.exportBtn}>
             <Download color="#475569" size={16} style={{ marginRight: 6 }} />
-            <Text style={styles.exportBtnText}>Export QR</Text>
+            <Text style={styles.exportBtnText}>{t('tbl_export_qr')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
             <Plus color="white" size={16} style={{ marginRight: 6 }} />
@@ -92,19 +92,19 @@ export default function TableManagement() {
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, { backgroundColor: 'rgba(255, 107, 53, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#ff6b35' }]}>{occupiedCount}</Text>
-          <Text style={styles.statLabel}>{t('tbl_occupied')}</Text>
+          <Text style={styles.statLabel}>{t('tbl_occupied_cap')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#10b981' }]}>{vacantCount}</Text>
-          <Text style={styles.statLabel}>Vacant</Text>
+          <Text style={styles.statLabel}>{t('tbl_vacant_cap')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: 'rgba(59, 130, 246, 0.05)' }]}>
           <Text style={[styles.statValue, { color: '#3b82f6' }]}>{reservedCount}</Text>
-          <Text style={styles.statLabel}>{t('tbl_reserved')}</Text>
+          <Text style={styles.statLabel}>{t('tbl_reserved_sm').toUpperCase()}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: 'transparent' }]}>
           <Text style={[styles.statValue, { color: '#64748b' }]}>{inactiveCount}</Text>
-          <Text style={styles.statLabel}>Inactive</Text>
+          <Text style={styles.statLabel}>{t('tbl_inactive')}</Text>
         </View>
       </View>
 
@@ -117,10 +117,10 @@ export default function TableManagement() {
             const isVacant = item.is_active && !isOccupied && !isReserved;
             
             let color = '#94a3b8'; // inactive / grey
-            let label = 'INACTIVE';
-            if(isOccupied) { color = '#ff6b35'; label = 'OCCUPIED'; }
-            else if(isReserved) { color = '#3b82f6'; label = 'RESERVED'; }
-            else if(isVacant) { color = '#10b981'; label = 'VACANT'; }
+            let label = t('tbl_inactive');
+            if(isOccupied) { color = '#ff6b35'; label = t('tbl_occupied_cap'); }
+            else if(isReserved) { color = '#3b82f6'; label = t('tbl_reserved_sm').toUpperCase(); }
+            else if(isVacant) { color = '#10b981'; label = t('tbl_vacant_cap'); }
 
             const displayNum = item.table_number.replace('T-', '').replace('Table ', '');
             
@@ -143,13 +143,13 @@ export default function TableManagement() {
                     <Text style={styles.statusPillText}>{label}</Text>
                   </View>
                   <TouchableOpacity style={styles.viewQrBtn}>
-                    <Text style={styles.viewQrText}>View QR</Text>
+                    <Text style={styles.viewQrText}>{t('tbl_view_qr')}</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Card Footer */}
                 <View style={styles.cardFooter}>
-                  <Text style={styles.orderText}>{item.current_order_id ? `#${item.current_order_id}` : 'No order'}</Text>
+                  <Text style={styles.orderText}>{item.current_order_id ? `#${item.current_order_id}` : t('tbl_no_order')}</Text>
                   
                   <View style={styles.actionsGroup}>
                     <Switch 
