@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, DeviceEventEmitter, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, DeviceEventEmitter, Image, Alert, BackHandler } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { orderService, tableService, reportsService } from '../services/api';
@@ -46,6 +46,24 @@ export default function HotelManagerDashboard({ navigation }) {
       }
     });
     return () => navSub.remove();
+  }, [activeTab]);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (activeTab && activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true;
+      }
+      
+      Alert.alert('Exit App', 'Are you sure you want to exit?', [
+        { text: 'Cancel', onPress: () => null, style: 'cancel' },
+        { text: 'YES', onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
   }, [activeTab]);
 
   const fetchData = async () => {

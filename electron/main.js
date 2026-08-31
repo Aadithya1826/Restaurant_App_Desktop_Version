@@ -184,3 +184,33 @@ ipcMain.handle('dequeue-sync-action', async (event, id) => {
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle('print-silent', async (event, htmlContent) => {
+  return new Promise((resolve) => {
+    let printWindow = new BrowserWindow({ 
+      show: false,
+      width: 300,
+      height: 600,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+
+    printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+    printWindow.webContents.on('did-finish-load', () => {
+      printWindow.webContents.print({ 
+        silent: true, 
+        printBackground: true,
+        color: false,
+        margins: { marginType: 'none' },
+        pageSize: { width: 72000, height: 297000 } // Typical 80mm roll width
+      }, (success, failureReason) => {
+        printWindow.close();
+        resolve(success);
+      });
+    });
+  });
+});
+

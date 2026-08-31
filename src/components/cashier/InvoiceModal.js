@@ -23,7 +23,7 @@ const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMet
             <View style={styles.centerAlign}>
               <Text style={styles.hotelName}>{restaurantData?.name || 'DATA UDIPI HOTEL'}</Text>
               <Text style={styles.textNormal}>{restaurantData?.address || 'M G R Nagar, Chennai'}</Text>
-              <Text style={styles.textNormal}>Phone: {restaurantData?.phone || '31595014'}</Text>
+              <Text style={styles.textNormal}>Phone: {(restaurantData?.name || '').toLowerCase().includes('mugalivakkam') ? '+91 95970 66563' : (restaurantData?.phone || '31595014')}</Text>
             </View>
 
             <View style={styles.counterBox}>
@@ -47,8 +47,25 @@ const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMet
             </View>
 
             {lastFutureSale && lastFutureSale.name ? (
-              <View style={styles.infoRow}>
-                <Text style={styles.textNormal}>Future Sale: {lastFutureSale.name}</Text>
+              <View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.textNormal}>Future Sale: {lastFutureSale.name}</Text>
+                </View>
+                {lastFutureSale.phone ? (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.textNormal}>Phone: {lastFutureSale.phone}</Text>
+                  </View>
+                ) : null}
+                {lastFutureSale.deliveryDate ? (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.textNormal}>Del. Date: {lastFutureSale.deliveryDate}</Text>
+                  </View>
+                ) : null}
+                {lastFutureSale.deliveryTime ? (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.textNormal}>Del. Time: {lastFutureSale.deliveryTime}</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
 

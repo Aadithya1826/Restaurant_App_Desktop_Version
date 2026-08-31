@@ -56,10 +56,17 @@ export const initOfflineSync = () => {
               console.log(`[OfflineSync] Network still down. Stopping sync attempt.`);
               break; 
             } else {
-              // If it fails with a 4xx or 5xx, we might want to log it and remove it to prevent blocking
-              console.error(`[OfflineSync] Action ${action.id} failed with server error:`, e.response.status);
+              // If it fails with a 401 (Unauthorized) or 5xx (Server Error), retain it in the queue
+              const status = e.response.status;
+              console.error(`[OfflineSync] Action ${action.id} failed with server error:`, status);
               await window.electronAPI.logError(`Sync failed for ${action.id}: ${e.message}`);
-              await window.electronAPI.dequeueSyncAction(action.id);
+              
+              if (status !== 401 && status < 500) {
+                // Remove if it's a 4xx error (other than 401), e.g., 400 Bad Request, 422 Validation
+                await window.electronAPI.dequeueSyncAction(action.id);
+              } else {
+                console.log(`[OfflineSync] Retaining action ${action.id} in queue due to status ${status}`);
+              }
             }
           }
         }

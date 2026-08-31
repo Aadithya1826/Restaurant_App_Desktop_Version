@@ -75,7 +75,7 @@ const VoiceWidget = ({ onNavigate }) => {
   const [liveText, setLiveText] = useState('');
   const [inputText, setInputText] = useState('');
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
-  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(true);
   
   const soundRef = useRef(null);
   const scrollViewRef = useRef(null);
@@ -174,6 +174,12 @@ const VoiceWidget = ({ onNavigate }) => {
     ).start();
   }, [pulseAnim]);
 
+  useEffect(() => {
+    if (isExpanded && isVoiceModeRef.current && !isListening && !isProcessing && !liveText && messages.length === 1) {
+      startListening();
+    }
+  }, [isExpanded, isListening, isProcessing, liveText, messages.length]);
+
   const handleUserVoiceInput = async (text, isVoice = false, base64Audio = null) => {
     const trimmedText = text.trim();
     if (!trimmedText && !base64Audio) return;
@@ -182,7 +188,10 @@ const VoiceWidget = ({ onNavigate }) => {
     setMessages((prev) => [...prev, { id: userMsgId, role: 'user', text: base64Audio ? "🎤 Audio Message" : trimmedText }]);
     
     setIsProcessing(true);
-    if (!isExpanded) setIsExpanded(true);
+    if (!isExpanded) {
+      setIsExpanded(true);
+      // Let the useEffect handle auto-start if needed, or we explicitly don't double start here.
+    }
 
     try {
       const historyToSend = messages.slice(-10).map(m => ({
@@ -224,6 +233,14 @@ const VoiceWidget = ({ onNavigate }) => {
 
       if (response.data.tool_name === 'navigate_to_page' && response.data.tool_result && onNavigate) {
         onNavigate(response.data.tool_result.page, response.data.tool_result.subtab);
+      } else if (response.data.tool_name === 'control_chat_window' && response.data.tool_result) {
+        if (response.data.tool_result.action === 'minimize') {
+          setIsExpanded(false);
+          setIsVoiceMode(false);
+          if (isListening) stopListening(true);
+        } else if (response.data.tool_result.action === 'maximize') {
+          setIsExpanded(true);
+        }
       }
 
     } catch (error) {
@@ -270,7 +287,13 @@ const VoiceWidget = ({ onNavigate }) => {
       }
       
       if (Platform.OS === 'web') {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true,
+          }
+        });
         streamRef.current = stream;
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;

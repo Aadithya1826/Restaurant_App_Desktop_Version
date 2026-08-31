@@ -238,7 +238,9 @@ export default function MenuManagement() {
                     style={{ width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none', paddingHorizontal: 12, fontSize: 14 }}
                   >
                     <Picker.Item label="Select Category" value="" />
-                    {categories.map(cat => (
+                    {categories
+                      .filter(cat => cat.name.toLowerCase().includes('mugalivakkam'))
+                      .map(cat => (
                       <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
                     ))}
                   </Picker>

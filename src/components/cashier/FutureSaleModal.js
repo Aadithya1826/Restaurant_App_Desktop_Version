@@ -51,6 +51,32 @@ const FutureSaleModal = ({ show, setShow, futureSale, setFutureSale }) => {
               onChangeText={(text) => setFutureSale(prev => ({ ...prev, deliveryDate: text }))}
             />
           )}
+          {Platform.OS === 'web' ? (
+            <input
+              type="time"
+              style={{
+                borderWidth: '1px',
+                borderColor: '#ccc',
+                borderStyle: 'solid',
+                borderRadius: '5px',
+                padding: '10px',
+                marginBottom: '10px',
+                width: '100%',
+                boxSizing: 'border-box',
+                fontSize: '14px',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+              }}
+              value={futureSale.deliveryTime || ''}
+              onChange={(e) => setFutureSale(prev => ({ ...prev, deliveryTime: e.target.value }))}
+            />
+          ) : (
+            <TextInput
+              style={styles.input}
+              placeholder="Delivery Time (HH:MM)"
+              value={futureSale.deliveryTime}
+              onChangeText={(text) => setFutureSale(prev => ({ ...prev, deliveryTime: text }))}
+            />
+          )}
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.cancelButton} onPress={() => setShow(false)}>
               <Text>Cancel</Text>

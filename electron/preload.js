@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sync Queue Operations
   queueSyncAction: (endpoint, method, payload) => ipcRenderer.invoke('queue-sync-action', endpoint, method, payload),
   getSyncQueue: () => ipcRenderer.invoke('get-sync-queue'),
-  dequeueSyncAction: (id) => ipcRenderer.invoke('dequeue-sync-action', id)
+  dequeueSyncAction: (id) => ipcRenderer.invoke('dequeue-sync-action', id),
+  printSilent: (html) => ipcRenderer.invoke('print-silent', html)
 });

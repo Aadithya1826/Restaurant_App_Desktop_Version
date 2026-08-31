@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform, BackHandler } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { menuService, restaurantService } from '../services/api';
 import api from '../services/api';
@@ -8,6 +8,7 @@ import { backupData } from '../services/offlineSync';
 import { LogOut, Trash2 } from 'lucide-react-native';
 import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
+import OrderHistoryModal from '../components/cashier/OrderHistoryModal';
 import DateRangeModal from '../components/cashier/DateRangeModal';
 import { Picker } from '@react-native-picker/picker';
 
@@ -34,12 +35,13 @@ export default function CashierDashboard({ navigation }) {
   const [showInvoice, setShowInvoice] = useState(false);
   const [showFutureSaleModal, setShowFutureSaleModal] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [dateRangeReportType, setDateRangeReportType] = useState('items');
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
   const [orderType, setOrderType] = useState('take-away');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [futureSale, setFutureSale] = useState({ name: '', address: '', city: '', phone: '', deliveryDate: '' });
+  const [futureSale, setFutureSale] = useState({ name: '', address: '', city: '', phone: '', deliveryDate: '', deliveryTime: '' });
 
   const [lastOrderType, setLastOrderType] = useState('take-away');
   const [lastFutureSale, setLastFutureSale] = useState(null);
@@ -47,11 +49,14 @@ export default function CashierDashboard({ navigation }) {
   const [lastCart, setLastCart] = useState([]);
   const [restaurantData, setRestaurantData] = useState(null);
   const [printFutureBills, setPrintFutureBills] = useState(false);
+  const [extraCharge, setExtraCharge] = useState('');
+  const extraChargeRef = useRef(null);
 
   const productCodeRef = useRef(null);
   const descriptionRef = useRef(null);
   const spacePressTimer = useRef(null);
   const lastSpaceTime = useRef(0);
+  const isProcessingRef = useRef(false);
   const cartInputRefs = useRef({});
 
   useEffect(() => {
@@ -92,6 +97,24 @@ export default function CashierDashboard({ navigation }) {
   }, [user]);
 
   useEffect(() => {
+    const backAction = () => {
+      if (showInvoice) { setShowInvoice(false); return true; }
+      if (showFutureSaleModal) { setShowFutureSaleModal(false); return true; }
+      if (showOrderHistory) { setShowOrderHistory(false); return true; }
+      if (showDateRangeModal) { setShowDateRangeModal(false); return true; }
+      
+      Alert.alert('Exit App', 'Are you sure you want to exit?', [
+        { text: 'Cancel', onPress: () => null, style: 'cancel' },
+        { text: 'YES', onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [showInvoice, showFutureSaleModal, showOrderHistory, showDateRangeModal]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.altKey && e.key === '7') {
         e.preventDefault();
@@ -125,6 +148,16 @@ export default function CashierDashboard({ navigation }) {
         e.preventDefault();
         e.stopPropagation();
         setPrintFutureBills(prev => !prev);
+      }
+      if (e.key === 'F8') {
+        e.preventDefault();
+        e.stopPropagation();
+        extraChargeRef.current?.focus();
+      }
+      if (e.key === 'F9') {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePrintItemCodes();
       }
       if (e.key === 'F10') {
         e.preventDefault();
@@ -258,8 +291,12 @@ export default function CashierDashboard({ navigation }) {
   };
 
   const handleQtyTextChange = (id, val) => {
+    if (val === '') {
+      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: '', amount: 0 } : item));
+      return;
+    }
     const num = parseInt(val);
-    if (!isNaN(num) && num > 0) {
+    if (!isNaN(num) && num >= 0) {
       setCart(prev => prev.map(item => item.id === id ? { ...item, qty: num, amount: num * item.rate } : item));
     }
   };
@@ -287,16 +324,26 @@ export default function CashierDashboard({ navigation }) {
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
     const totalAmt = cart.reduce((sum, item) => sum + item.amount, 0);
+    const extraNum = parseFloat(extraCharge) || 0;
+    const finalTotal = totalAmt + extraNum;
 
     const payload = {
+      order_type: orderType === 'take-away' ? 'TAKEAWAY' : orderType === 'delivery' ? 'DELIVERY' : 'DINE_IN',
       table_number: orderType === 'take-away' ? 'takeaway' : '1',
       payment_method: paymentMethod,
-      cart: cart.map(c => ({ id: c.id, quantity: c.qty, price: c.rate })),
+      cart: cart.filter(c => c.qty && !isNaN(parseInt(c.qty)) && parseInt(c.qty) > 0).map(c => ({ id: c.id, quantity: parseInt(c.qty), price: c.rate })),
       subtotal: totalAmt,
       gst: 0,
       service_charge: 0,
-      total_amount: totalAmt
+      total_amount: finalTotal,
+      customer_name: orderType === 'delivery' ? futureSale.name : undefined,
+      customer_phone: orderType === 'delivery' ? futureSale.phone : undefined,
+      delivery_address: orderType === 'delivery' ? futureSale.address : undefined,
+      delivery_city: orderType === 'delivery' ? futureSale.city : undefined,
+      timestamp: new Date().toISOString(),
     };
 
     const dateStr = new Date().toISOString().split('T')[0];
@@ -307,7 +354,7 @@ export default function CashierDashboard({ navigation }) {
       .catch(err => Alert.alert("Error", "Failed to place order"));
 
     setLastBillNo(billNo);
-    setLastBillAmt(totalAmt);
+    setLastBillAmt(finalTotal);
     setBillNo(prev => {
       const next = prev + 1;
       localStorage.setItem('last_bill_no', next.toString());
@@ -318,28 +365,21 @@ export default function CashierDashboard({ navigation }) {
     setLastOrderType(orderType);
     setLastPaymentMethod(paymentMethod);
     setLastFutureSale({ ...futureSale });
-    setFutureSale({ name: '', address: '', city: '', phone: '', deliveryDate: '' });
-    setShowInvoice(true);
+    setFutureSale({ name: '', address: '', city: '', phone: '', deliveryDate: '', deliveryTime: '' });
+    setExtraCharge('');
     
+
     if (Platform.OS === 'web') {
       const currentDate = new Date().toLocaleString('en-US', {
         month: 'numeric', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
       });
-      
-      const itemRows = cart.map(item => `
-        <div class="row">
-          <div class="item-name">${item.description}</div>
-          <div class="item-qty">${item.qty}</div>
-          <div class="item-amt">${item.amount.toFixed(2)}</div>
-        </div>
-      `).join('');
-
       const resName = restaurantData?.name || 'DATA UDIPI HOTEL';
       const resAddr = restaurantData?.address || 'M G R Nagar, Chennai';
-      const resPhone = restaurantData?.phone || '31595014';
+      const resPhone = resName.toLowerCase().includes('mugalivakkam') ? '+91 95970 66563' : (restaurantData?.phone || '31595014');
 
       const tandooriItems = cart.filter(item => {
+        if (!item.qty || isNaN(parseInt(item.qty)) || parseInt(item.qty) <= 0) return false;
         if (item.description.toLowerCase().includes('tandoori')) return true;
         const cat = categories.find(c => c.id === item.category_id);
         if (cat && cat.name.toLowerCase().includes('tandoori')) return true;
@@ -366,7 +406,7 @@ export default function CashierDashboard({ navigation }) {
             <span>${currentDate}</span>
           </div>
           <div>
-            <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'}
+            <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : orderType === 'delivery' ? 'Delivery' : 'Dine In'}
           </div>
           <div class="divider"></div>
           <div class="row bold">
@@ -393,13 +433,14 @@ export default function CashierDashboard({ navigation }) {
               <span>${currentDate}</span>
             </div>
             <div>
-              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : 'Dine In'} | 
+              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : orderType === 'delivery' ? 'Delivery' : 'Dine In'} | 
               <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
             </div>
             ${futureSale.name ? `<div><span class="bold">Future Sale:</span> ${futureSale.name}</div>` : ''}
             ${futureSale.phone ? `<div><span class="bold">Phone:</span> ${futureSale.phone}</div>` : ''}
             ${futureSale.address ? `<div><span class="bold">Address:</span> ${futureSale.address}</div>` : ''}
             ${futureSale.deliveryDate ? `<div><span class="bold">Del. Date:</span> ${futureSale.deliveryDate}</div>` : ''}
+            ${futureSale.deliveryTime ? `<div><span class="bold">Del. Time:</span> ${futureSale.deliveryTime}</div>` : ''}
             <div class="divider"></div>
             <div class="row bold">
               <div class="item-name">Item</div>
@@ -407,11 +448,25 @@ export default function CashierDashboard({ navigation }) {
               <div class="item-amt">Amt</div>
             </div>
             <div class="divider"></div>
-            ${itemRows}
+            ${cart.filter(c => c.qty && parseInt(c.qty) > 0).map(item => `
+              <div class="row">
+                <div class="item-name">${item.description}</div>
+                <div class="item-qty">${item.qty}</div>
+                <div class="item-amt">${item.amount.toFixed(2)}</div>
+              </div>
+            `).join('')}
             <div class="divider"></div>
+            ${extraNum > 0 ? `
+              <div class="row">
+                <div class="item-name">EXTRA CHARGES</div>
+                <div class="item-qty"></div>
+                <div class="item-amt">${extraNum.toFixed(2)}</div>
+              </div>
+              <div class="divider"></div>
+            ` : ''}
             <div class="row bold" style="font-size: 14px;">
               <span>TOTAL</span>
-              <span>₹${totalAmt.toFixed(2)}</span>
+              <span>₹${finalTotal.toFixed(2)}</span>
             </div>
             <div class="divider"></div>
             <div class="center" style="margin-top: 10px;">Thank you! Visit again.</div>
@@ -432,14 +487,14 @@ export default function CashierDashboard({ navigation }) {
           <head>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0; padding: 5px; width: 72mm; color: #000; }
+              body { font-family: monospace; font-size: 14px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; font-weight: bold; }
               .center { text-align: center; }
-              h1 { font-size: 16px; margin: 5px 0; }
+              h1 { font-size: 18px; margin: 5px 0; font-weight: 900; }
               .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
               .row { display: flex; justify-content: space-between; }
-              .item-name { flex: 2; word-break: break-all; padding-right: 5px; }
-              .item-qty { width: 30px; text-align: right; }
-              .item-amt { width: 60px; text-align: right; }
+              .item-name { flex: 2; word-break: break-all; padding-right: 5px; text-transform: uppercase; }
+              .item-qty { width: 45px; text-align: center; }
+              .item-amt { width: 75px; text-align: right; padding-left: 10px; }
               .bold { font-weight: bold; }
             </style>
           </head>
@@ -449,18 +504,52 @@ export default function CashierDashboard({ navigation }) {
         </html>
       `;
 
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      iframe.contentWindow.document.open();
-      iframe.contentWindow.document.write(html);
-      iframe.contentWindow.document.close();
-      iframe.contentWindow.focus();
-      setTimeout(() => {
-        iframe.contentWindow.print();
-        document.body.removeChild(iframe);
-      }, 500);
+      if (window.electronAPI && window.electronAPI.printSilent) {
+        window.electronAPI.printSilent(html).then(() => {
+          setTimeout(() => {
+            productCodeRef.current?.focus();
+          }, 100);
+        });
+      } else {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(html);
+        iframe.contentWindow.document.close();
+        iframe.contentWindow.focus();
+        setTimeout(() => {
+          iframe.contentWindow.print();
+          document.body.removeChild(iframe);
+          setTimeout(() => {
+            productCodeRef.current?.focus();
+          }, 100);
+        }, 500);
+      }
     }
+
+    setTimeout(() => {
+      isProcessingRef.current = false;
+    }, 2000);
+  };
+
+  const handleShowHistoryBill = (order) => {
+    setLastBillNo(order.order_id);
+    let type = 'dine-in';
+    if (!order.table_number || order.table_number.toLowerCase().includes('takeaway')) {
+      type = 'take-away';
+    }
+    setLastOrderType(type);
+    setLastPaymentMethod(order.payment_method);
+    setLastFutureSale(null);
+    const mappedCart = (order.items || []).map(item => ({
+      description: item.name,
+      qty: item.quantity,
+      amount: item.price
+    }));
+    setLastCart(mappedCart);
+    setLastBillAmt(order.total_amount);
+    setShowInvoice(true);
   };
 
   const handlePrintReport = async (type, startDate, endDate) => {
@@ -480,7 +569,7 @@ export default function CashierDashboard({ navigation }) {
 
       let tableRows = '';
       if (type === 'hourly') {
-        tableRows = (data.timeline || []).map(t => `
+        tableRows = (data.timeline || []).filter(t => Math.round(t.sales) > 0).map(t => `
           <div class="row">
             <span>${t.time}</span>
             <span>${Math.round(t.sales)}</span>
@@ -510,7 +599,7 @@ export default function CashierDashboard({ navigation }) {
             <title>Print Receipt</title>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; width: 72mm; box-sizing: border-box; color: #000; }
+              body { font-family: monospace; font-size: 12px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; }
               .header { text-align: center; margin-bottom: 10px; }
               .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; }
               .header p { margin: 0 0 4px 0; text-transform: uppercase; }
@@ -548,19 +637,111 @@ export default function CashierDashboard({ navigation }) {
         </html>
       `;
 
+      if (window.electronAPI && window.electronAPI.printSilent) {
+        window.electronAPI.printSilent(printContent).then(() => {
+          setTimeout(() => { productCodeRef.current?.focus(); }, 100);
+        });
+      } else {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(printContent);
+        iframe.contentWindow.document.close();
+        iframe.contentWindow.focus();
+        setTimeout(() => {
+          iframe.contentWindow.print();
+          document.body.removeChild(iframe);
+        }, 500);
+      }
+    } catch (e) {
+      alert("Failed to print report.");
+    }
+  };
+
+  const handlePrintItemCodes = () => {
+    if (!menuItems || menuItems.length === 0) {
+      alert("No items in menu to print");
+      return;
+    }
+
+    const currentDate = new Date().toLocaleString('en-US', {
+      month: 'numeric', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+    });
+
+    const resName = restaurantData?.name || 'DATA UDIPI HOTEL';
+    const resAddr = restaurantData?.address || 'M G R Nagar, Chennai';
+    const resPhone = resName.toLowerCase().includes('mugalivakkam') ? '+91 95970 66563' : (restaurantData?.phone || '31595014');
+
+    const itemRows = menuItems.map(item => `
+      <div class="row">
+        <div class="item-name">${item.name || 'Unknown'}</div>
+        <div class="item-code">${item.item_code || ''}</div>
+      </div>
+    `).join('');
+
+    const html = `
+      <html>
+        <head>
+          <style>
+            @page { margin: 0; }
+            body { font-family: monospace; font-size: 12px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; }
+            .center { text-align: center; }
+            h1 { font-size: 16px; margin: 5px 0; }
+            h2 { font-size: 14px; margin: 10px 0 5px 0; }
+            .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+            .item-name { flex: 3; word-break: break-all; padding-right: 5px; text-transform: uppercase; }
+            .item-code { flex: 1; text-align: right; font-weight: bold; }
+            .bold { font-weight: bold; }
+            .footer { margin-top: 10px; font-size: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            <h1>${resName}</h1>
+            <div style="font-size: 11px;">${resAddr.replace(/,/g, ',<br>')}</div>
+            <div style="font-size: 11px;">PH:${resPhone}</div>
+            <h2>MENU ITEM CODES</h2>
+          </div>
+          <div class="divider"></div>
+          <div class="row bold">
+            <span>PRINT DATE:</span>
+            <span>${currentDate.split(',')[0]}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="row bold">
+            <div class="item-name">Item Name</div>
+            <div class="item-code">Code</div>
+          </div>
+          <div class="divider"></div>
+          ${itemRows}
+          <div class="divider"></div>
+          <div class="center footer">
+            Techwizard AI partners<br>hello@t-wi.com
+          </div>
+        </body>
+      </html>
+    `;
+
+    if (window.electronAPI && window.electronAPI.printSilent) {
+      window.electronAPI.printSilent(html).then(() => {
+        setTimeout(() => { productCodeRef.current?.focus(); }, 100);
+      });
+    } else {
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       document.body.appendChild(iframe);
       iframe.contentWindow.document.open();
-      iframe.contentWindow.document.write(printContent);
+      iframe.contentWindow.document.write(html);
       iframe.contentWindow.document.close();
       iframe.contentWindow.focus();
       setTimeout(() => {
         iframe.contentWindow.print();
         document.body.removeChild(iframe);
+        setTimeout(() => { productCodeRef.current?.focus(); }, 100);
       }, 500);
-    } catch (e) {
-      alert("Failed to print report.");
     }
   };
 
@@ -626,6 +807,7 @@ export default function CashierDashboard({ navigation }) {
                 <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker} dataSet={{ zone: '0', index: '0' }}>
                   <Picker.Item label="[7] Take Away" value="take-away" />
                   <Picker.Item label="[8] Dine In" value="dine-in" />
+                  <Picker.Item label="Delivery" value="delivery" />
                 </Picker>
               </View>
               <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('hourly')}>
@@ -633,6 +815,12 @@ export default function CashierDashboard({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('items')}>
                 <Text style={styles.reportBtnText}>Item Report</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportBtn} onPress={handlePrintItemCodes}>
+                <Text style={styles.reportBtnText}>Item Code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportBtn} onPress={() => setShowOrderHistory(true)}>
+                <Text style={styles.reportBtnText}>Orders</Text>
               </TouchableOpacity>
             </View>
             <TextInput
@@ -772,12 +960,23 @@ export default function CashierDashboard({ navigation }) {
               <Text style={styles.subtotalLabel}>{t('cashier_subtotal')}</Text>
               <Text style={styles.subtotalValue}>₹{totalAmount.toFixed(2)}</Text>
             </View>
+            <View style={[styles.subtotalRow, { alignItems: 'center' }]}>
+              <Text style={styles.subtotalLabel}>Extra Charges [F8]</Text>
+              <TextInput
+                ref={extraChargeRef}
+                style={[styles.subtotalValue, { borderBottomWidth: 1, borderColor: '#d1d5db', width: 80, textAlign: 'right', paddingVertical: 2, paddingHorizontal: 4, fontSize: 13, outlineStyle: 'none' }]}
+                keyboardType="numeric"
+                value={extraCharge}
+                onChangeText={(text) => setExtraCharge(text.replace(/[^0-9.]/g, ''))}
+                placeholder="0.00"
+              />
+            </View>
             <View style={styles.totalRowFixed}>
               <Text style={styles.totalLabelFixed}>{t('cashier_total')}</Text>
-              <Text style={styles.totalValueFixed}>₹{totalAmount.toFixed(2)}</Text>
+              <Text style={styles.totalValueFixed}>₹{(totalAmount + (parseFloat(extraCharge) || 0)).toFixed(2)}</Text>
             </View>
             <TouchableOpacity style={styles.chargeBtnDark} onPress={handleCheckout} dataSet={{ hover: 'btn' }}>
-              <Text style={styles.chargeBtnDarkText}>Charge ₹{totalAmount.toFixed(2)}</Text>
+              <Text style={styles.chargeBtnDarkText}>Charge ₹{(totalAmount + (parseFloat(extraCharge) || 0)).toFixed(2)}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -807,6 +1006,14 @@ export default function CashierDashboard({ navigation }) {
           setDateRangeReportType={setDateRangeReportType}
         />
       )}
+      <OrderHistoryModal
+        show={showOrderHistory}
+        setShow={setShowOrderHistory}
+        restaurantData={restaurantData}
+        api={api}
+        user={user}
+        onShowBill={handleShowHistoryBill}
+      />
     </View>
   );
 }

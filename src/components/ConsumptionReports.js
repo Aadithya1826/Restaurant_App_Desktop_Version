@@ -130,12 +130,19 @@ export default function ConsumptionReports() {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Text style={styles.dateLabel}>Report Date:</Text>
-              {Platform.OS === 'web' && (
+              {Platform.OS === 'web' ? (
                 <input 
                   type="date" 
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontFamily: 'inherit', fontSize: '14px' }}
+                />
+              ) : (
+                <TextInput 
+                  value={selectedDate}
+                  onChangeText={setSelectedDate}
+                  placeholder="YYYY-MM-DD"
+                  style={{ padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', fontSize: 14 }}
                 />
               )}
             </View>

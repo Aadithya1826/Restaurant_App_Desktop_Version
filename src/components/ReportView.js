@@ -103,17 +103,21 @@ export default function ReportView({ type, onBack }) {
       </html>
     `;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-    iframe.contentWindow.document.open();
-    iframe.contentWindow.document.write(printContent);
-    iframe.contentWindow.document.close();
-    iframe.contentWindow.focus();
-    setTimeout(() => {
-      iframe.contentWindow.print();
-      document.body.removeChild(iframe);
-    }, 250);
+    if (window.electronAPI && window.electronAPI.printSilent) {
+      window.electronAPI.printSilent(printContent);
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      iframe.contentWindow.document.open();
+      iframe.contentWindow.document.write(printContent);
+      iframe.contentWindow.document.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        document.body.removeChild(iframe);
+      }, 250);
+    }
   };
 
   if (loading && !reportData) {

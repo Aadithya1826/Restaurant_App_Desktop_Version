@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Image, Platform, DeviceEventEmitter, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, TextInput, FlatList, Image, Platform, DeviceEventEmitter, Animated, Easing, useWindowDimensions, BackHandler } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -61,12 +61,35 @@ export default function AdminDashboard({ navigation }) {
       chartAnim.setValue(0);
       Animated.timing(chartAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 1000,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
     }
-  }, [activeTab, chartAnim]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (showAddHotel) { setShowAddHotel(false); return true; }
+      if (showEditHotel) { setShowEditHotel(false); return true; }
+      if (showAddManager) { setShowAddManager(false); return true; }
+      if (showEditManager) { setShowEditManager(false); return true; }
+      if (activeTab && activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true;
+      }
+      
+      Alert.alert('Exit App', 'Are you sure you want to exit?', [
+        { text: 'Cancel', onPress: () => null, style: 'cancel' },
+        { text: 'YES', onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [activeTab, showAddHotel, showEditHotel, showAddManager, showEditManager]);
+
   useEffect(() => {
     fetchData();
     const navSub = DeviceEventEmitter.addListener('navigate_tab', (data) => {
