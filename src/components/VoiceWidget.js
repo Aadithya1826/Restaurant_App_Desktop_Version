@@ -210,35 +210,80 @@ const VoiceWidget = ({ onNavigate }) => {
       }
 
       const response = await api.post('/api/v1/mcp/voice/ask', payload);
-      const replyText = response.data.assistant_text;
+      let replyText = "";
+      let responseTranscribed = null;
+      let toolName = null;
+      let toolResult = null;
+      let audioChunks = [];
+
+      if (typeof response.data === 'string') {
+        const lines = response.data.split('\n\n');
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.substring(6);
+            if (dataStr === "[DONE]") continue;
+            try {
+              const parsedData = JSON.parse(dataStr);
+              if (parsedData.type === "llm_chunk") {
+                replyText += parsedData.chunk;
+              } else if (parsedData.type === "transcription") {
+                responseTranscribed = parsedData.text;
+              } else if (parsedData.type === "tool_call") {
+                toolName = parsedData.tool_name;
+                toolResult = parsedData.tool_result;
+              } else if (parsedData.type === "audio" && parsedData.payload && parsedData.payload !== "null") {
+                audioChunks.push(parsedData.payload);
+              }
+            } catch (e) {}
+          }
+        }
+        
+        // Clean up assistant_text from llm_chunks
+        const match = replyText.match(/"assistant_text"\s*:\s*"((?:[^"\\]|\\.)*)/);
+        if (match) {
+            replyText = match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        } else {
+            replyText = "I couldn't process that.";
+        }
+      } else {
+        replyText = response.data.assistant_text || "";
+        responseTranscribed = response.data.transcribed_user_text;
+        toolName = response.data.tool_name;
+        toolResult = response.data.tool_result;
+        if (response.data.audio_payload && response.data.audio_payload !== "null") {
+           audioChunks.push(response.data.audio_payload);
+        }
+      }
 
       setMessages((prev) => {
         const newMessages = [...prev];
-        if (base64Audio && response.data.transcribed_user_text) {
+        if (base64Audio && responseTranscribed) {
           const userMsgIndex = newMessages.findIndex(m => m.id === userMsgId);
           if (userMsgIndex !== -1) {
-            newMessages[userMsgIndex] = { ...newMessages[userMsgIndex], text: response.data.transcribed_user_text };
+            newMessages[userMsgIndex] = { ...newMessages[userMsgIndex], text: responseTranscribed };
           }
         }
         newMessages.push({ id: Date.now() + 1, role: 'assistant', text: replyText });
         return newMessages;
       });
 
-      if (response.data.audio_payload && !isSpeakerMuted) {
-        await playAudioBase64(response.data.audio_payload);
+      if (!isSpeakerMuted && audioChunks.length > 0) {
+        audioChunks.forEach(chunk => audioQueueRef.current.push(chunk));
+        if (!isPlayingAudioRef.current) {
+          processAudioQueue(!!base64Audio);
+        }
       } else if (isVoiceModeRef.current && !isSpeakerMuted) {
-         // Auto-resume if in voice mode and no audio returned
          startListening();
       }
 
-      if (response.data.tool_name === 'navigate_to_page' && response.data.tool_result && onNavigate) {
-        onNavigate(response.data.tool_result.page, response.data.tool_result.subtab);
-      } else if (response.data.tool_name === 'control_chat_window' && response.data.tool_result) {
-        if (response.data.tool_result.action === 'minimize') {
+      if (toolName === 'navigate_to_page' && toolResult && onNavigate) {
+        onNavigate(toolResult.page, toolResult.subtab);
+      } else if (toolName === 'control_chat_window' && toolResult) {
+        if (toolResult.action === 'minimize') {
           setIsExpanded(false);
           setIsVoiceMode(false);
           if (isListening) stopListening(true);
-        } else if (response.data.tool_result.action === 'maximize') {
+        } else if (toolResult.action === 'maximize') {
           setIsExpanded(true);
         }
       }
@@ -255,28 +300,37 @@ const VoiceWidget = ({ onNavigate }) => {
     }
   };
 
-  const playAudioBase64 = async (base64Audio) => {
+  const audioQueueRef = useRef([]);
+  const isPlayingAudioRef = useRef(false);
+
+  const processAudioQueue = async (wasVoiceInput) => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingAudioRef.current = false;
+      if (wasVoiceInput && isVoiceModeRef.current) startListening();
+      return;
+    }
+    isPlayingAudioRef.current = true;
+    const base64Audio = audioQueueRef.current.shift();
+    
     try {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
       }
       
       const uri = `data:audio/mp3;base64,${base64Audio}`;
-      const { sound } = await Audio.Sound.createAsync({ uri });
+      const { sound } = await Audio.Sound.createAsync({ uri }, { rate: 1.15, shouldCorrectPitch: true });
       soundRef.current = sound;
       
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
-          if (isVoiceModeRef.current) {
-             startListening();
-          }
+          processAudioQueue(wasVoiceInput);
         }
       });
       
       await sound.playAsync();
     } catch (error) {
       console.error("Audio playback failed:", error);
-      if (isVoiceModeRef.current) startListening();
+      processAudioQueue(wasVoiceInput);
     }
   };
 
