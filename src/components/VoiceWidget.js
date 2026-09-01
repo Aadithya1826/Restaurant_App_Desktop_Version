@@ -231,8 +231,8 @@ const VoiceWidget = ({ onNavigate }) => {
               } else if (parsedData.type === "tool_call") {
                 toolName = parsedData.tool_name;
                 toolResult = parsedData.tool_result;
-              } else if (parsedData.type === "audio" && parsedData.payload && parsedData.payload !== "null") {
-                audioChunks.push(parsedData.payload);
+              } else if (parsedData.type === "audio") {
+                audioChunks.push({ base64Data: parsedData.payload, fallbackText: parsedData.fallbackText });
               }
             } catch (e) {}
           }
@@ -250,8 +250,8 @@ const VoiceWidget = ({ onNavigate }) => {
         responseTranscribed = response.data.transcribed_user_text;
         toolName = response.data.tool_name;
         toolResult = response.data.tool_result;
-        if (response.data.audio_payload && response.data.audio_payload !== "null") {
-           audioChunks.push(response.data.audio_payload);
+        if (response.data.audio_payload || response.data.fallbackText) {
+           audioChunks.push({ base64Data: response.data.audio_payload, fallbackText: response.data.fallbackText || replyText });
         }
       }
 
@@ -310,24 +310,33 @@ const VoiceWidget = ({ onNavigate }) => {
       return;
     }
     isPlayingAudioRef.current = true;
-    const base64Audio = audioQueueRef.current.shift();
+    const { base64Data, fallbackText } = audioQueueRef.current.shift();
     
     try {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
       }
       
-      const uri = `data:audio/mp3;base64,${base64Audio}`;
-      const { sound } = await Audio.Sound.createAsync({ uri }, { rate: 1.15, shouldCorrectPitch: true });
-      soundRef.current = sound;
-      
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          processAudioQueue(wasVoiceInput);
-        }
-      });
-      
-      await sound.playAsync();
+      if (base64Data && base64Data !== "null") {
+        const uri = `data:audio/mp3;base64,${base64Data}`;
+        const { sound } = await Audio.Sound.createAsync({ uri }, { rate: 1.15, shouldCorrectPitch: true });
+        soundRef.current = sound;
+        
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish) {
+            processAudioQueue(wasVoiceInput);
+          }
+        });
+        
+        await sound.playAsync();
+      } else if (fallbackText && Platform.OS === 'web' && 'speechSynthesis' in window) {
+        const utterance = new window.SpeechSynthesisUtterance(fallbackText);
+        utterance.onend = () => processAudioQueue(wasVoiceInput);
+        utterance.onerror = () => processAudioQueue(wasVoiceInput);
+        window.speechSynthesis.speak(utterance);
+      } else {
+        processAudioQueue(wasVoiceInput);
+      }
     } catch (error) {
       console.error("Audio playback failed:", error);
       processAudioQueue(wasVoiceInput);
