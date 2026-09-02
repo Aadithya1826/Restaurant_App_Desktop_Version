@@ -89,12 +89,15 @@ export default function OrdersManagement() {
     }
   };
 
-  const isTakeaway = (order) => !order.table_number || order.table_number === 'N/A' || order.table_number.toString().toLowerCase() === 'takeaway';
+  const isDelivery = (order) => order.order_type?.toLowerCase() === 'delivery';
+  const isTakeaway = (order) => !isDelivery(order) && (!order.table_number || order.table_number === 'N/A' || order.table_number.toString().toLowerCase() === 'takeaway');
+  const isDineIn = (order) => !isDelivery(order) && !isTakeaway(order);
 
-  const dineInOrders = orders.filter(o => !isTakeaway(o));
+  const dineInOrders = orders.filter(o => isDineIn(o));
   const takeawayOrders = orders.filter(o => isTakeaway(o));
+  const deliveryOrders = orders.filter(o => isDelivery(o));
   
-  const filteredOrders = (orderMode === 'TAKEAWAY' ? takeawayOrders : dineInOrders)
+  const filteredOrders = (orderMode === 'TAKEAWAY' ? takeawayOrders : orderMode === 'DELIVERY' ? deliveryOrders : dineInOrders)
     .sort((a, b) => b.order_id - a.order_id);
 
   const getTimeAgo = (dateString) => {
@@ -143,11 +146,11 @@ export default function OrdersManagement() {
           {colOrders.map(item => {
             const nextStatus = item.status === 'PENDING' || item.status === 'CONFIRMED' ? 'PREPARING' : 
                                item.status === 'PREPARING' ? 'READY' : 
-                               item.status === 'READY' ? (orderMode === 'TAKEAWAY' ? 'PICKED_UP' : 'SERVED') : null;
+                               item.status === 'READY' ? (orderMode !== 'DINE_IN' ? 'PICKED_UP' : 'SERVED') : null;
             
             const actionText = nextStatus === 'PREPARING' ? t('ord_start_prep') : 
                                nextStatus === 'READY' ? t('ord_mark_ready') : 
-                               nextStatus === 'PICKED_UP' ? 'Mark Picked up' : 
+                               nextStatus === 'PICKED_UP' ? (orderMode === 'DELIVERY' ? 'Mark Dispatched' : 'Mark Picked up') : 
                                nextStatus === 'SERVED' ? 'Mark Served' : null;
 
             return (
@@ -162,7 +165,7 @@ export default function OrdersManagement() {
                 </Text>
                 
                 <View style={styles.cardMid}>
-                  <Text style={styles.table}>{isTakeaway(item) ? 'Takeaway' : `Table ${item.table_number}`}</Text>
+                  <Text style={styles.table}>{isDelivery(item) ? 'Delivery' : isTakeaway(item) ? 'Takeaway' : `Table ${item.table_number}`}</Text>
                   <Text style={styles.price}>₹ {item.total_amount}</Text>
                 </View>
                 
@@ -232,6 +235,16 @@ export default function OrdersManagement() {
               <View style={styles.toggleBadge}><Text style={styles.toggleBadgeText}>{takeawayOrders.length}</Text></View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.toggleBtn, orderMode === 'DELIVERY' && styles.activeToggleBtn]} 
+            onPress={() => setOrderMode('DELIVERY')}
+          >
+            <Text style={[styles.toggleText, orderMode === 'DELIVERY' && styles.activeToggleText]}>Delivery</Text>
+            {deliveryOrders.length > 0 && orderMode !== 'DELIVERY' && (
+              <View style={styles.toggleBadge}><Text style={styles.toggleBadgeText}>{deliveryOrders.length}</Text></View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -265,11 +278,11 @@ export default function OrdersManagement() {
               </View>
               <View style={styles.kotRow}>
                 <Text style={styles.kotTextBold}>Table</Text>
-                <Text style={styles.kotText}>{selectedKOTOrder && (!selectedKOTOrder.table_number || selectedKOTOrder.table_number === 'N/A' || selectedKOTOrder.table_number.toString().toLowerCase() === 'takeaway') ? 'Takeaway' : `T${selectedKOTOrder?.table_number?.toString().padStart(2, '0')}`}</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && (isDelivery(selectedKOTOrder) ? 'Delivery' : isTakeaway(selectedKOTOrder) ? 'Takeaway' : `T${selectedKOTOrder?.table_number?.toString().padStart(2, '0')}`)}</Text>
               </View>
               <View style={[styles.kotRow, { marginBottom: 16 }]}>
                 <Text style={styles.kotTextBold}>Type</Text>
-                <Text style={styles.kotText}>{selectedKOTOrder && (!selectedKOTOrder.table_number || selectedKOTOrder.table_number === 'N/A' || selectedKOTOrder.table_number.toString().toLowerCase() === 'takeaway') ? 'Takeaway' : 'Dine-In'}</Text>
+                <Text style={styles.kotText}>{selectedKOTOrder && (isDelivery(selectedKOTOrder) ? 'Delivery' : isTakeaway(selectedKOTOrder) ? 'Takeaway' : 'Dine-In')}</Text>
               </View>
 
               <View style={styles.dashedLine} />
