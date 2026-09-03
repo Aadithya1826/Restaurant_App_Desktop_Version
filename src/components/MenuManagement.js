@@ -16,7 +16,7 @@ export default function MenuManagement() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [newItem, setNewItem] = useState({ name: '', category_id: '', price: '', description: '', quantity: '0', image_url: '' });
+  const [newItem, setNewItem] = useState({ name: '', ac_type: 'Both', category_id: '', price: '', description: '', quantity: '0', image_url: '' });
 
   useEffect(() => { fetchData(); }, []);
 
@@ -56,10 +56,10 @@ export default function MenuManagement() {
     }
     try {
       if (editingItem) {
-        const updated = await menuService.updateItem(editingItem.id, { ...newItem, category_id: parseInt(newItem.category_id), price: parseFloat(newItem.price), quantity: parseInt(newItem.quantity) });
+        const updated = await menuService.updateItem(editingItem.id, { ...newItem, ac_type: newItem.ac_type || 'Both', category_id: parseInt(newItem.category_id), price: parseFloat(newItem.price), quantity: parseInt(newItem.quantity) });
         setItems(items.map(i => i.id === editingItem.id ? updated : i));
       } else {
-        const created = await menuService.createItem({ ...newItem, category_id: parseInt(newItem.category_id), price: parseFloat(newItem.price), quantity: parseInt(newItem.quantity) });
+        const created = await menuService.createItem({ ...newItem, ac_type: newItem.ac_type || 'Both', category_id: parseInt(newItem.category_id), price: parseFloat(newItem.price), quantity: parseInt(newItem.quantity) });
         setItems([...items, created]);
       }
       setIsModalOpen(false);
@@ -80,7 +80,7 @@ export default function MenuManagement() {
 
   const openModal = (item = null) => {
     setEditingItem(item);
-    setNewItem(item ? { ...item, quantity: item.quantity?.toString() || '0' } : { name: '', category_id: '', price: '', description: '', quantity: '0', image_url: '' });
+    setNewItem(item ? { ...item, ac_type: item.ac_type || 'Both', quantity: item.quantity?.toString() || '0' } : { name: '', ac_type: 'Both', category_id: '', price: '', description: '', quantity: '0', image_url: '' });
     setIsModalOpen(true);
   };
 
@@ -167,7 +167,14 @@ export default function MenuManagement() {
               </View>
 
               <View style={styles.cardBody}>
-                <Text style={styles.itemId}>ID: {item.id}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Text style={styles.itemId}>ID: {item.id}</Text>
+                  {item.ac_type && item.ac_type !== 'Both' && (
+                    <View style={{ backgroundColor: item.ac_type === 'A/C' ? '#DBEAFE' : '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: item.ac_type === 'A/C' ? '#1E40AF' : '#92400E' }}>{item.ac_type}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.itemDesc} numberOfLines={2}>{item.description || 'Crispy golden crepe filled with spiced potato, served with...'}</Text>
 
@@ -227,6 +234,21 @@ export default function MenuManagement() {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>{t('menu_item_name')}</Text>
                 <TextInput style={styles.input} placeholder="e.g. Masala Dosa" value={newItem.name} onChangeText={t => setNewItem({ ...newItem, name: t })} />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>SECTION TYPE</Text>
+                <View style={[styles.input, { padding: 0, overflow: 'hidden', height: 44, justifyContent: 'center' }]}>
+                  <Picker
+                    selectedValue={newItem.ac_type}
+                    onValueChange={(itemValue) => setNewItem({ ...newItem, ac_type: itemValue })}
+                    style={{ width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none', paddingHorizontal: 12, fontSize: 14 }}
+                  >
+                    <Picker.Item label="Both (A/C & Non A/C)" value="Both" />
+                    <Picker.Item label="A/C Only" value="A/C" />
+                    <Picker.Item label="Non A/C Only" value="Non A/C" />
+                  </Picker>
+                </View>
               </View>
 
               <View style={styles.formGroup}>
