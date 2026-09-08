@@ -10,6 +10,7 @@ import {
   TrendingUp, Clock
 } from 'lucide-react-native';
 import MenuManagement from '../components/MenuManagement';
+import CateringMenuManagement from '../components/CateringMenuManagement';
 import OrdersManagement from '../components/OrdersManagement';
 import TableManagement from '../components/TableManagement';
 import InventoryManagement from '../components/InventoryManagement';
@@ -288,6 +289,7 @@ export default function HotelManagerDashboard({ navigation }) {
           <View style={styles.tabContent}>
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'menu' && <MenuManagement />}
+            {activeTab === 'catering' && <CateringMenuManagement />}
             {activeTab === 'orders' && <OrdersManagement />}
             {activeTab === 'tables' && <TableManagement />}
             {activeTab === 'inventory' && <InventoryManagement setActiveTab={setActiveTab} />}
