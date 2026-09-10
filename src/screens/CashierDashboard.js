@@ -315,10 +315,6 @@ export default function CashierDashboard({ navigation }) {
       } else {
         Alert.alert("Not Found", "Item code not found");
       }
-    } else {
-      if (cart.length > 0) {
-        handleCheckout();
-      }
     }
   };
 
