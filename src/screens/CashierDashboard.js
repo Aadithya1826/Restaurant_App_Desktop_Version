@@ -275,7 +275,7 @@ export default function CashierDashboard({ navigation }) {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
       if (existing) {
-        return prev.map(c => c.id === item.id ? { ...c, qty: c.qty + 1, amount: (c.qty + 1) * c.rate } : c);
+        return prev.map(c => c.id === item.id ? { ...c, qty: (parseFloat(c.qty) || 0) + 1, amount: ((parseFloat(c.qty) || 0) + 1) * c.rate } : c);
       }
       return [...prev, {
         id: item.id,
@@ -291,13 +291,14 @@ export default function CashierDashboard({ navigation }) {
   };
 
   const handleQtyTextChange = (id, val) => {
-    if (val === '') {
-      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: '', amount: 0 } : item));
+    // Allow valid decimal strings (e.g. "1", "1.", "1.5")
+    if (val === '' || val === '.') {
+      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: val, amount: 0 } : item));
       return;
     }
-    const num = parseInt(val);
+    const num = parseFloat(val);
     if (!isNaN(num) && num >= 0) {
-      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: num, amount: num * item.rate } : item));
+      setCart(prev => prev.map(item => item.id === id ? { ...item, qty: val, amount: num * item.rate } : item));
     }
   };
 
@@ -330,7 +331,7 @@ export default function CashierDashboard({ navigation }) {
       order_type: orderType === 'take-away' ? 'TAKEAWAY' : orderType === 'delivery' ? 'DELIVERY' : 'DINE_IN',
       table_number: orderType === 'take-away' ? 'takeaway' : '1',
       payment_method: paymentMethod,
-      cart: cart.filter(c => c.qty && !isNaN(parseInt(c.qty)) && parseInt(c.qty) > 0).map(c => ({ id: c.id, quantity: parseInt(c.qty), price: c.rate })),
+      cart: cart.filter(c => c.qty && !isNaN(parseFloat(c.qty)) && parseFloat(c.qty) > 0).map(c => ({ id: c.id, quantity: parseFloat(c.qty), price: c.rate })),
       subtotal: totalAmt,
       gst: 0,
       service_charge: 0,
@@ -375,7 +376,7 @@ export default function CashierDashboard({ navigation }) {
       const resPhone = resName.toLowerCase().includes('mugalivakkam') ? '+91 95970 66563' : (restaurantData?.phone || '31595014');
 
       const tandooriItems = cart.filter(item => {
-        if (!item.qty || isNaN(parseInt(item.qty)) || parseInt(item.qty) <= 0) return false;
+        if (!item.qty || isNaN(parseFloat(item.qty)) || parseFloat(item.qty) <= 0) return false;
         if (item.description.toLowerCase().includes('tandoori')) return true;
         const cat = categories.find(c => c.id === item.category_id);
         if (cat && cat.name.toLowerCase().includes('tandoori')) return true;
@@ -444,7 +445,7 @@ export default function CashierDashboard({ navigation }) {
               <div class="item-amt">Amt</div>
             </div>
             <div class="divider"></div>
-            ${cart.filter(c => c.qty && parseInt(c.qty) > 0).map(item => `
+            ${cart.filter(c => c.qty && parseFloat(c.qty) > 0).map(item => `
               <div class="row">
                 <div class="item-name">${item.description}</div>
                 <div class="item-qty">${item.qty}</div>
@@ -762,8 +763,15 @@ export default function CashierDashboard({ navigation }) {
 
   const updateQty = (id, delta) => {
     setCart(prev => {
-      const newCart = prev.map(c => c.id === id ? { ...c, qty: c.qty + delta, amount: (c.qty + delta) * c.rate } : c);
-      return newCart.filter(c => c.qty > 0);
+      const newCart = prev.map(c => {
+        if (c.id === id) {
+          const current = parseFloat(c.qty) || 0;
+          const updated = current + delta;
+          return { ...c, qty: updated, amount: updated * c.rate };
+        }
+        return c;
+      });
+      return newCart.filter(c => parseFloat(c.qty) > 0);
     });
   };
 
