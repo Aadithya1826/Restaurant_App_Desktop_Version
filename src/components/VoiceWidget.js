@@ -62,6 +62,11 @@ const TypingIndicator = () => {
 
 
 const VoiceWidget = ({ onNavigate, onVoiceCommand }) => {
+  const propsRef = useRef({ onNavigate, onVoiceCommand });
+  useEffect(() => {
+    propsRef.current = { onNavigate, onVoiceCommand };
+  }, [onNavigate, onVoiceCommand]);
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState([
@@ -276,8 +281,8 @@ const VoiceWidget = ({ onNavigate, onVoiceCommand }) => {
          startListening();
       }
 
-      if (toolName === 'navigate_to_page' && toolResult && onNavigate) {
-        onNavigate(toolResult.page, toolResult.subtab);
+      if (toolName === 'navigate_to_page' && toolResult && propsRef.current.onNavigate) {
+        propsRef.current.onNavigate(toolResult.page, toolResult.subtab);
       } else if (toolName === 'control_chat_window' && toolResult) {
         if (toolResult.action === 'minimize') {
           setIsExpanded(false);
@@ -288,8 +293,8 @@ const VoiceWidget = ({ onNavigate, onVoiceCommand }) => {
         }
       }
       
-      if (onVoiceCommand) {
-        onVoiceCommand(toolName, toolResult);
+      if (propsRef.current.onVoiceCommand) {
+        propsRef.current.onVoiceCommand(toolName, toolResult);
       }
 
     } catch (error) {
