@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform, BackHandler } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform, BackHandler, PanResponder, Dimensions } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { menuService, restaurantService } from '../services/api';
 import api from '../services/api';
@@ -10,6 +10,7 @@ import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
 import OrderHistoryModal from '../components/cashier/OrderHistoryModal';
 import DateRangeModal from '../components/cashier/DateRangeModal';
+import VoiceWidget from '../components/VoiceWidget';
 import { Picker } from '@react-native-picker/picker';
 
 export default function CashierDashboard({ navigation }) {
@@ -19,6 +20,27 @@ export default function CashierDashboard({ navigation }) {
   const { user, logout } = useAuth();
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
+
+  const [leftFlex, setLeftFlex] = useState(7);
+  const [rightFlex, setRightFlex] = useState(3);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (evt, gestureState) => {
+        const { width } = Dimensions.get('window');
+        const percentage = gestureState.moveX / width;
+        if (percentage > 0.4 && percentage < 0.8) {
+           const left = percentage * 10;
+           const right = 10 - left;
+           setLeftFlex(left);
+           setRightFlex(right);
+        }
+      },
+    })
+  ).current;
+
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('All');
   const [selectedRegion, setSelectedRegion] = useState('All');
@@ -319,6 +341,46 @@ export default function CashierDashboard({ navigation }) {
     }
   };
 
+  const handleVoiceCommand = (toolName, toolResult) => {
+    if (toolName === 'add_to_cart_cashier' && toolResult?.items) {
+      setCart(prevCart => {
+        let newCart = [...prevCart];
+        toolResult.items.forEach(voiceItem => {
+          const menuMatch = menuItems.find(m => 
+            m.name.toLowerCase() === voiceItem.name.toLowerCase() || 
+            m.name.toLowerCase().includes(voiceItem.name.toLowerCase())
+          );
+          if (menuMatch) {
+            const existing = newCart.find(c => c.id === menuMatch.id);
+            if (existing) {
+              existing.qty = parseFloat(existing.qty) + voiceItem.quantity;
+              existing.amount = existing.qty * existing.rate;
+            } else {
+              const price = parseFloat(menuMatch.price) || 0;
+              newCart.push({
+                id: menuMatch.id,
+                product_code: menuMatch.item_code || menuMatch.id,
+                description: menuMatch.name || menuMatch.description || 'Unknown Item',
+                rate: price,
+                qty: voiceItem.quantity,
+                amount: price * voiceItem.quantity,
+                pref: ''
+              });
+            }
+          } else {
+            Alert.alert('Item Not Found', `Item "${voiceItem.name}" not found in menu.`);
+          }
+        });
+        return newCart;
+      });
+    } else if (toolName === 'print_cashier_bill') {
+      handleCheckout();
+    } else if (toolName === 'print_future_bill') {
+      setFutureSale({ name: 'Future Order', address: '', city: '', phone: '', deliveryDate: '' });
+      setShowFutureSaleModal(true);
+    }
+  };
+
   const handleCheckout = () => {
     if (cart.length === 0) return;
     if (isProcessingRef.current) return;
@@ -484,7 +546,7 @@ export default function CashierDashboard({ navigation }) {
           <head>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 14px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; font-weight: bold; }
+              body { font-family: monospace; font-size: 14px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; font-weight: bold; }
               .center { text-align: center; }
               h1 { font-size: 18px; margin: 5px 0; font-weight: 900; }
               .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
@@ -596,7 +658,7 @@ export default function CashierDashboard({ navigation }) {
             <title>Print Receipt</title>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; }
+              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; }
               .header { text-align: center; margin-bottom: 10px; }
               .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; }
               .header p { margin: 0 0 4px 0; text-transform: uppercase; }
@@ -683,7 +745,7 @@ export default function CashierDashboard({ navigation }) {
         <head>
           <style>
             @page { margin: 0; }
-            body { font-family: monospace; font-size: 12px; margin: 0 auto; padding: 5px; width: 95%; max-width: 70mm; box-sizing: border-box; color: #000; }
+            body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; }
             .center { text-align: center; }
             h1 { font-size: 16px; margin: 5px 0; }
             h2 { font-size: 14px; margin: 10px 0 5px 0; }
@@ -803,7 +865,7 @@ export default function CashierDashboard({ navigation }) {
       {/* Main Layout */}
       <View style={[styles.mainLayout, { flexDirection: isTablet ? 'row' : 'column' }]}>
         {/* Left Panel */}
-        <View style={[styles.leftPanel, { flex: isTablet ? 7 : 1 }]}>
+        <View style={[styles.leftPanel, { flex: isTablet ? leftFlex : 1 }]}>
 
           <View style={styles.inputStack}>
             <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
@@ -905,8 +967,21 @@ export default function CashierDashboard({ navigation }) {
           </View>
         </View>
 
+        {/* RESIZER */}
+        {isTablet && (
+          <View
+            {...panResponder.panHandlers}
+            style={{
+              width: 10,
+              backgroundColor: '#e5e7eb',
+              cursor: Platform.OS === 'web' ? 'col-resize' : 'default',
+              zIndex: 10,
+            }}
+          />
+        )}
+
         {/* Right Panel (Cart) */}
-        <View style={[styles.rightPanel, { flex: isTablet ? 3 : 1 }]}>
+        <View style={[styles.rightPanel, { flex: isTablet ? rightFlex : 1 }]}>
           <View style={styles.cartHeaderTop}>
             <Text style={styles.cartHeaderTitle}>{t('cashier_current_order')}</Text>
             <TouchableOpacity onPress={() => setCart([])} dataSet={{ hover: 'btn' }}>
@@ -1018,6 +1093,7 @@ export default function CashierDashboard({ navigation }) {
         user={user}
         onShowBill={handleShowHistoryBill}
       />
+      <VoiceWidget onVoiceCommand={handleVoiceCommand} />
     </View>
   );
 }

@@ -61,7 +61,7 @@ const TypingIndicator = () => {
 };
 
 
-const VoiceWidget = ({ onNavigate }) => {
+const VoiceWidget = ({ onNavigate, onVoiceCommand }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState([
@@ -286,6 +286,10 @@ const VoiceWidget = ({ onNavigate }) => {
         } else if (toolResult.action === 'maximize') {
           setIsExpanded(true);
         }
+      }
+      
+      if (onVoiceCommand) {
+        onVoiceCommand(toolName, toolResult);
       }
 
     } catch (error) {
