@@ -532,49 +532,57 @@ export default function CashierDashboard({ navigation }) {
             <div class="center" style="margin-top: 10px; font-size: 10px;">Techwizard AI partners<br/>hello@t-wi.com</div>
       `;
 
-      let finalBodyHtml = kotHtml + billHtml;
+      const printJobs = [];
+      if (kotHtml) printJobs.push(kotHtml);
+      if (billHtml) printJobs.push(billHtml);
       if (printFutureBills) {
-        finalBodyHtml += `
-            <div style="page-break-after: always;"></div>
+        printJobs.push(`
             <div class="center bold" style="font-size: 14px; margin-bottom: 10px;">HOTEL COPY</div>
             ${billHtml}
-        `;
+        `);
       }
 
-      const html = `
+      const makeHtml = (bodyContent) => `
         <html>
           <head>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 14px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; font-weight: bold; }
+              body { font-family: monospace; font-size: 13px; margin: 0; padding: 0 10px 0 15px; width: 100%; max-width: 76mm; box-sizing: border-box; color: #000; font-weight: bold; }
               .center { text-align: center; }
-              h1 { font-size: 18px; margin: 5px 0; font-weight: 900; }
+              h1 { font-size: 16px; margin: 5px 0; font-weight: 900; }
               .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
               .row { display: flex; justify-content: space-between; }
-              .item-name { flex: 2; word-break: break-all; padding-right: 5px; text-transform: uppercase; }
-              .item-qty { width: 45px; text-align: center; }
-              .item-amt { width: 75px; text-align: right; padding-left: 10px; }
+              .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
+              .item-qty { width: 35px; text-align: center; }
+              .item-amt { width: 60px; text-align: right; }
               .bold { font-weight: bold; }
             </style>
           </head>
           <body>
-            ${finalBodyHtml}
+            ${bodyContent}
           </body>
         </html>
       `;
 
       if (window.electronAPI && window.electronAPI.printSilent) {
-        window.electronAPI.printSilent(html).then(() => {
+        const executePrints = async () => {
+          for (const bodyContent of printJobs) {
+            await window.electronAPI.printSilent(makeHtml(bodyContent));
+            // wait a little bit between jobs to ensure order and spooler processing
+            await new Promise(r => setTimeout(r, 500));
+          }
           setTimeout(() => {
             productCodeRef.current?.focus();
           }, 100);
-        });
+        };
+        executePrints();
       } else {
+        const combinedBody = printJobs.join('<div style="page-break-after: always;"></div>');
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         document.body.appendChild(iframe);
         iframe.contentWindow.document.open();
-        iframe.contentWindow.document.write(html);
+        iframe.contentWindow.document.write(makeHtml(combinedBody));
         iframe.contentWindow.document.close();
         iframe.contentWindow.focus();
         setTimeout(() => {
@@ -658,15 +666,15 @@ export default function CashierDashboard({ navigation }) {
             <title>Print Receipt</title>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; }
+              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 10px 0 15px; width: 100%; max-width: 76mm; box-sizing: border-box; color: #000; }
               .header { text-align: center; margin-bottom: 10px; }
-              .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; }
+              .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: 900; }
               .header p { margin: 0 0 4px 0; text-transform: uppercase; }
               .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
               .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-              .item-name { flex: 2; word-break: break-word; padding-right: 5px; }
-              .item-qty { flex: 1; text-align: right; }
-              .item-amt { flex: 1; text-align: right; }
+              .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
+              .item-qty { width: 35px; text-align: center; }
+              .item-amt { width: 60px; text-align: right; }
               .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
             </style>
           </head>
@@ -745,14 +753,14 @@ export default function CashierDashboard({ navigation }) {
         <head>
           <style>
             @page { margin: 0; }
-            body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 25px; width: 100%; max-width: 75mm; box-sizing: border-box; color: #000; }
+            body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 10px 0 15px; width: 100%; max-width: 76mm; box-sizing: border-box; color: #000; }
             .center { text-align: center; }
-            h1 { font-size: 16px; margin: 5px 0; }
+            h1 { font-size: 16px; margin: 5px 0; font-weight: 900; }
             h2 { font-size: 14px; margin: 10px 0 5px 0; }
             .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
             .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .item-name { flex: 3; word-break: break-all; padding-right: 5px; text-transform: uppercase; }
-            .item-code { flex: 1; text-align: right; font-weight: bold; }
+            .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
+            .item-code { width: 40px; text-align: right; font-weight: bold; }
             .bold { font-weight: bold; }
             .footer { margin-top: 10px; font-size: 10px; }
           </style>
