@@ -547,7 +547,7 @@ export default function CashierDashboard({ navigation }) {
           <head>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 13px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 72mm; box-sizing: border-box; color: #000; font-weight: bold; }
+              body { font-family: monospace; font-size: 13px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 68mm; box-sizing: border-box; color: #000; font-weight: bold; }
               .center { text-align: center; }
               h1 { font-size: 16px; margin: 5px 0; font-weight: 900; }
               .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
@@ -666,7 +666,7 @@ export default function CashierDashboard({ navigation }) {
             <title>Print Receipt</title>
             <style>
               @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 72mm; box-sizing: border-box; color: #000; }
+              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 68mm; box-sizing: border-box; color: #000; }
               .header { text-align: center; margin-bottom: 10px; }
               .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: 900; }
               .header p { margin: 0 0 4px 0; text-transform: uppercase; }
@@ -753,7 +753,7 @@ export default function CashierDashboard({ navigation }) {
         <head>
           <style>
             @page { margin: 0; }
-            body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 72mm; box-sizing: border-box; color: #000; }
+            body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 68mm; box-sizing: border-box; color: #000; }
             .center { text-align: center; }
             h1 { font-size: 16px; margin: 5px 0; font-weight: 900; }
             h2 { font-size: 14px; margin: 10px 0 5px 0; }
