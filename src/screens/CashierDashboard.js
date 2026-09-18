@@ -953,14 +953,9 @@ export default function CashierDashboard({ navigation }) {
               <Text style={[styles.thText, { flex: 1 }]}>{t('cashier_item')}</Text>
               <Text style={[styles.thText, { width: 100, textAlign: 'right', paddingRight: 40 }]}>{t('cashier_price')}</Text>
             </View>
-            <FlatList
-              data={filteredItems}
-              keyExtractor={item => item.id.toString()}
-              showsVerticalScrollIndicator={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item, index }) => (
-                <View style={styles.tableRow} dataSet={{ hover: 'nav' }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={true}>
+              {filteredItems.map((item, index) => (
+                <View key={item.id.toString()} style={styles.tableRow} dataSet={{ hover: 'nav' }}>
                   <Text style={[styles.tdCode, { width: 80 }]}>{item.item_code || item.id}</Text>
                   <Text style={[styles.tdName, { flex: 1 }]}>{item.name}</Text>
                   <View style={{ width: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -970,8 +965,8 @@ export default function CashierDashboard({ navigation }) {
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
-            />
+              ))}
+            </ScrollView>
           </View>
         </View>
 
@@ -998,13 +993,9 @@ export default function CashierDashboard({ navigation }) {
           </View>
           <Text style={styles.cartSubtitle}>{cart.length} lines · {cart.reduce((a, b) => a + b.qty, 0)} items</Text>
 
-          <FlatList
-            data={cart}
-            keyExtractor={item => item.id.toString()}
-            style={{ flex: 1, paddingHorizontal: 24 }}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <View style={styles.cartRow}>
+          <ScrollView style={{ flex: 1, paddingHorizontal: 24 }} showsVerticalScrollIndicator={true}>
+            {cart.map((item) => (
+              <View key={item.id.toString()} style={styles.cartRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cartRowName}>{item.description}</Text>
                   <Text style={styles.cartRowRate}>₹{item.rate.toFixed(2)}</Text>
@@ -1024,8 +1015,8 @@ export default function CashierDashboard({ navigation }) {
                 </View>
                 <Text style={styles.cartRowTotal}>₹{item.amount.toFixed(2)}</Text>
               </View>
-            )}
-          />
+            ))}
+          </ScrollView>
 
           <View style={styles.cartFooterArea}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
