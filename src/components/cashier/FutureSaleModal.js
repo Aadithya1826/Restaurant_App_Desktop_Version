@@ -52,23 +52,35 @@ const FutureSaleModal = ({ show, setShow, futureSale, setFutureSale }) => {
             />
           )}
           {Platform.OS === 'web' ? (
-            <input
-              type="time"
-              style={{
-                borderWidth: '1px',
-                borderColor: '#ccc',
-                borderStyle: 'solid',
-                borderRadius: '5px',
-                padding: '10px',
-                marginBottom: '10px',
-                width: '100%',
-                boxSizing: 'border-box',
-                fontSize: '14px',
-                fontFamily: 'system-ui, -apple-system, sans-serif'
-              }}
-              value={futureSale.deliveryTime || ''}
-              onChange={(e) => setFutureSale(prev => ({ ...prev, deliveryTime: e.target.value }))}
-            />
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginBottom: '10px', width: '100%' }}>
+              <input
+                type="text"
+                placeholder="HH:MM"
+                style={{
+                  borderWidth: '1px', borderColor: '#ccc', borderStyle: 'solid', borderRadius: '5px', padding: '10px', flex: 1, boxSizing: 'border-box', fontSize: '14px', fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}
+                value={futureSale.deliveryTime ? futureSale.deliveryTime.split(' ')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const ampm = (futureSale.deliveryTime && futureSale.deliveryTime.split(' ')[1]) || 'AM';
+                  setFutureSale(prev => ({ ...prev, deliveryTime: val ? `${val} ${ampm}` : '' }));
+                }}
+              />
+              <select
+                style={{
+                  borderWidth: '1px', borderColor: '#ccc', borderStyle: 'solid', borderRadius: '5px', padding: '10px', width: '80px', boxSizing: 'border-box', fontSize: '14px', fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: 'white'
+                }}
+                value={(futureSale.deliveryTime && futureSale.deliveryTime.split(' ')[1]) || 'AM'}
+                onChange={(e) => {
+                  const ampm = e.target.value;
+                  const val = futureSale.deliveryTime ? futureSale.deliveryTime.split(' ')[0] : '12:00';
+                  setFutureSale(prev => ({ ...prev, deliveryTime: `${val} ${ampm}` }));
+                }}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           ) : (
             <TextInput
               style={styles.input}
