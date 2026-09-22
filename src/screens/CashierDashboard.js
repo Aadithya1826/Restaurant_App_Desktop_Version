@@ -403,6 +403,7 @@ export default function CashierDashboard({ navigation }) {
       delivery_address: orderType === 'delivery' ? futureSale.address : undefined,
       delivery_city: orderType === 'delivery' ? futureSale.city : undefined,
       timestamp: new Date().toISOString(),
+      bill_no: billNo,
     };
 
     const dateStr = new Date().toISOString().split('T')[0];

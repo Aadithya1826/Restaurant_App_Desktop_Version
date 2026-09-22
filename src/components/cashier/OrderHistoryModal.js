@@ -53,8 +53,8 @@ const OrderHistoryModal = ({ show, setShow, restaurantData, api, user, onShowBil
           </View>
 
           <View style={styles.tableHeader}>
-            <Text style={[styles.headerCell, {flex: 1}]}>Bill No</Text>
-            <Text style={[styles.headerCell, {flex: 2}]}>Time</Text>
+            <Text style={[styles.headerCell, {flex: 1.5}]}>Order / Bill</Text>
+            <Text style={[styles.headerCell, {flex: 1.5}]}>Time</Text>
             <Text style={[styles.headerCell, {flex: 1}]}>Total (₹)</Text>
             <Text style={[styles.headerCell, {width: 60, textAlign: 'center'}]}>Action</Text>
           </View>
@@ -77,8 +77,10 @@ const OrderHistoryModal = ({ show, setShow, restaurantData, api, user, onShowBil
                       style={styles.orderRow} 
                       onPress={() => setExpandedOrderId(isExpanded ? null : order.order_id)}
                     >
-                      <Text style={[styles.cell, {flex: 1, fontWeight: 'bold'}]}>#{order.order_id}</Text>
-                      <Text style={[styles.cell, {flex: 2}]}>{orderTime}</Text>
+                      <Text style={[styles.cell, {flex: 1.5, fontWeight: 'bold'}]}>
+                        #{order.branch_order_id || order.order_id} {order.bill_no ? `(B:${order.bill_no})` : ''}
+                      </Text>
+                      <Text style={[styles.cell, {flex: 1.5}]}>{orderTime}</Text>
                       <Text style={[styles.cell, {flex: 1, color: '#16a34a', fontWeight: 'bold'}]}>
                         ₹{order.total_amount?.toFixed(2)}
                       </Text>
