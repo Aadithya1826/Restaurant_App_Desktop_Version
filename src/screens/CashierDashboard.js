@@ -524,7 +524,7 @@ export default function CashierDashboard({ navigation }) {
               </div>
               <div class="divider"></div>
             ` : ''}
-            <div class="row bold" style="font-size: 14px;">
+            <div class="row bold" style="font-size: 16px; margin-top: 5px; transform: scaleY(1.3); margin-bottom: 6px;">
               <span>TOTAL</span>
               <span>₹${finalTotal.toFixed(2)}</span>
             </div>
@@ -552,7 +552,7 @@ export default function CashierDashboard({ navigation }) {
               .center { text-align: center; }
               h1 { font-size: 16px; margin: 5px 0; font-weight: 900; }
               .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
-              .row { display: flex; justify-content: space-between; }
+              .row { display: flex; justify-content: space-between; transform: scaleY(1.2); transform-origin: top left; margin-bottom: 4px; font-size: 14px; }
               .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
               .item-qty { width: 35px; text-align: center; }
               .item-amt { width: 60px; text-align: right; }
@@ -671,12 +671,12 @@ export default function CashierDashboard({ navigation }) {
               .header { text-align: center; margin-bottom: 10px; }
               .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: 900; }
               .header p { margin: 0 0 4px 0; text-transform: uppercase; }
-              .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-              .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+              .row { display: flex; justify-content: space-between; transform: scaleY(1.2); transform-origin: top left; margin-bottom: 6px; font-size: 14px; }
+              .item-row { display: flex; justify-content: space-between; transform: scaleY(1.2); transform-origin: top left; margin-bottom: 6px; font-size: 14px; }
               .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
               .item-qty { width: 35px; text-align: center; }
               .item-amt { width: 60px; text-align: right; }
-              .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
+              .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; transform: scaleY(1.3); transform-origin: top left; margin-bottom: 6px; }
             </style>
           </head>
           <body>
