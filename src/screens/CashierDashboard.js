@@ -956,16 +956,22 @@ export default function CashierDashboard({ navigation }) {
             </View>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={true}>
               {filteredItems.map((item, index) => (
-                <View key={item.id.toString()} style={styles.tableRow} dataSet={{ hover: 'nav' }}>
+                <TouchableOpacity 
+                  key={item.id.toString()} 
+                  style={styles.tableRow} 
+                  onPress={() => addItemToCart(item)}
+                  dataSet={{ hover: 'nav' }}
+                  activeOpacity={0.6}
+                >
                   <Text style={[styles.tdCode, { width: 80 }]}>{item.item_code || item.id}</Text>
                   <Text style={[styles.tdName, { flex: 1 }]}>{item.name}</Text>
                   <View style={{ width: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
                     <Text style={styles.tdPrice}>₹{(item.price || 0).toFixed(2)}</Text>
-                    <TouchableOpacity style={styles.addSquareBtn} onPress={() => addItemToCart(item)} dataSet={{ zone: '5', index: String(index), hover: 'btn' }}>
+                    <View style={styles.addSquareBtn}>
                       <Text style={styles.addSquareText}>+</Text>
-                    </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
