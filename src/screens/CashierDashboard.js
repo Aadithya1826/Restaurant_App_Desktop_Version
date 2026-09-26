@@ -71,6 +71,7 @@ export default function CashierDashboard({ navigation }) {
   const [lastCart, setLastCart] = useState([]);
   const [restaurantData, setRestaurantData] = useState(null);
   const [printFutureBills, setPrintFutureBills] = useState(false);
+  const [isAC, setIsAC] = useState(false);
   const [extraCharge, setExtraCharge] = useState('');
   const extraChargeRef = useRef(null);
 
@@ -138,6 +139,10 @@ export default function CashierDashboard({ navigation }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsAC(prev => !prev);
+      }
       if (e.altKey && e.key === '7') {
         e.preventDefault();
         setOrderType('take-away');
@@ -293,19 +298,35 @@ export default function CashierDashboard({ navigation }) {
     }
   }, [cart, showInvoice, showFutureSaleModal, orderType, paymentMethod, futureSale]);
 
+  useEffect(() => {
+    setCart(prev => prev.map(item => {
+      const baseRate = item.original_rate !== undefined ? item.original_rate : item.rate;
+      const newRate = baseRate + (isAC ? 10 : 0);
+      return { 
+        ...item, 
+        original_rate: baseRate, 
+        rate: newRate, 
+        amount: (parseFloat(item.qty) || 0) * newRate 
+      };
+    }));
+  }, [isAC]);
+
   const addItemToCart = (item) => {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
       if (existing) {
         return prev.map(c => c.id === item.id ? { ...c, qty: (parseFloat(c.qty) || 0) + 1, amount: ((parseFloat(c.qty) || 0) + 1) * c.rate } : c);
       }
+      const baseRate = item.price || 0;
+      const effectiveRate = baseRate + (isAC ? 10 : 0);
       return [...prev, {
         id: item.id,
         product_code: item.item_code || item.id,
         description: item.name || 'Unknown',
-        rate: item.price || 0,
+        rate: effectiveRate,
+        original_rate: baseRate,
         qty: 1,
-        amount: item.price || 0,
+        amount: effectiveRate,
         category_id: item.category_id
       }];
     });
@@ -1031,15 +1052,26 @@ export default function CashierDashboard({ navigation }) {
                 <Text style={styles.futureSaleLightText}>+ Future Sale</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer' }}
-                onPress={() => setPrintFutureBills(!printFutureBills)}
-              >
-                <View style={{ width: 16, height: 16, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4, marginRight: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: printFutureBills ? '#111827' : '#fff' }}>
-                  {printFutureBills && <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
-                </View>
-                <Text style={{ fontSize: 13, color: '#4b5563', fontWeight: '500' }}>[F4] Future Bills</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer' }}
+                  onPress={() => setIsAC(!isAC)}
+                >
+                  <View style={{ width: 16, height: 16, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4, marginRight: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: isAC ? '#111827' : '#fff' }}>
+                    {isAC && <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
+                  </View>
+                  <Text style={{ fontSize: 13, color: '#4b5563', fontWeight: '500' }}>[Alt+A] A/C</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer' }}
+                  onPress={() => setPrintFutureBills(!printFutureBills)}
+                >
+                  <View style={{ width: 16, height: 16, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4, marginRight: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: printFutureBills ? '#111827' : '#fff' }}>
+                    {printFutureBills && <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
+                  </View>
+                  <Text style={{ fontSize: 13, color: '#4b5563', fontWeight: '500' }}>[F4] Future Bills</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.subtotalRow}>
               <Text style={styles.subtotalLabel}>{t('cashier_subtotal')}</Text>
