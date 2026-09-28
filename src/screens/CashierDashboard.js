@@ -525,6 +525,7 @@ export default function CashierDashboard({ navigation }) {
             <div class="divider"></div>
             <div class="row bold">
               <div class="item-name">Item</div>
+              <div class="item-rate" style="width:50px; text-align:center;">Rate</div>
               <div class="item-qty">Qty</div>
               <div class="item-amt">Amt</div>
             </div>
@@ -532,6 +533,7 @@ export default function CashierDashboard({ navigation }) {
             ${cart.filter(c => c.qty && parseFloat(c.qty) > 0).map(item => `
               <div class="row">
                 <div class="item-name">${item.description}</div>
+                <div class="item-rate" style="width:50px; text-align:center;">${item.rate ? Number(item.rate).toString() : ''}</div>
                 <div class="item-qty">${item.qty}</div>
                 <div class="item-amt">${item.amount.toFixed(2)}</div>
               </div>
