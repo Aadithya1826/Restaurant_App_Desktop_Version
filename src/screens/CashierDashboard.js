@@ -545,7 +545,7 @@ export default function CashierDashboard({ navigation }) {
               </div>
               <div class="divider"></div>
             ` : ''}
-            <div class="row bold" style="font-size: 16px; margin-top: 5px; transform: scaleY(1.3); margin-bottom: 6px;">
+            <div class="row bold" style="font-size: 16px; margin-top: 10px; transform: scaleY(1.7); margin-bottom: 12px;">
               <span>TOTAL</span>
               <span>₹${finalTotal.toFixed(2)}</span>
             </div>
@@ -697,7 +697,7 @@ export default function CashierDashboard({ navigation }) {
               .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
               .item-qty { width: 40px; text-align: center; }
               .item-amt { width: 65px; text-align: right; }
-              .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; transform: scaleY(1.3); transform-origin: top left; margin-bottom: 6px; }
+              .total-row { border-top: 1px dashed #000; margin-top: 15px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; transform: scaleY(1.7); transform-origin: top left; margin-bottom: 12px; }
             </style>
           </head>
           <body>
