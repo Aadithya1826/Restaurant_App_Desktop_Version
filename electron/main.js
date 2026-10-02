@@ -163,8 +163,19 @@ ipcMain.handle('get-sync-queue', async () => {
     const queue = [];
     for (const file of files) {
       if (file.endsWith('.json')) {
-        const data = fs.readFileSync(path.join(folderPath, file), 'utf8');
-        queue.push(JSON.parse(data));
+        try {
+          const data = fs.readFileSync(path.join(folderPath, file), 'utf8');
+          if (data.trim()) {
+            queue.push(JSON.parse(data));
+          } else {
+            // Delete empty or whitespace-only files to prevent them from clogging
+            fs.unlinkSync(path.join(folderPath, file));
+          }
+        } catch (e) {
+          // If a file is completely corrupted, just delete it or ignore it
+          try { fs.unlinkSync(path.join(folderPath, file)); } catch(err) {}
+          console.error(`Error parsing sync file ${file}:`, e);
+        }
       }
     }
     return { success: true, queue: queue.sort((a, b) => a.id - b.id) };
