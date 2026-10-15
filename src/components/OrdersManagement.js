@@ -156,9 +156,41 @@ export default function OrdersManagement() {
             return (
               <View key={item.order_id} style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.orderId}>#{item.order_id}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.orderId}>#{item.branch_order_id || item.order_id}</Text>
+                    <View style={{
+                      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+                      backgroundColor: item.payment_status?.toLowerCase() === 'paid' ? '#e6f4ea' : '#fde8e8'
+                    }}>
+                      <Text style={{
+                        fontSize: 10, fontWeight: '700',
+                        color: item.payment_status?.toLowerCase() === 'paid' ? '#1e7e34' : '#e02424'
+                      }}>
+                        • {item.payment_status?.toLowerCase() === 'paid' ? (item.payment_method || 'Paid') : 'Pay at Counter'}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={styles.time}>{getTimeAgo(item.created_at)}</Text>
                 </View>
+
+                {(item.customer_name || item.customer_phone) && (
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                    {item.customer_name ? (
+                      <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#ffd8cc', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, maxWidth: 140 }}>
+                        <Text style={{ fontSize: 11, color: '#ff6b35', fontWeight: '600' }} numberOfLines={1}>
+                          👤 {item.customer_name}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {item.customer_phone ? (
+                      <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#ffd8cc', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, color: '#ff6b35', fontWeight: '600' }}>
+                          📞 {item.customer_phone}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
                 
                 <Text style={styles.items} numberOfLines={2}>
                   {item.items?.map(i => `${i.name} x${i.quantity}`).join(', ') || 'Items details not found'}

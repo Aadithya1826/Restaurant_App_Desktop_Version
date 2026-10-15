@@ -62,6 +62,10 @@ export default function CashierDashboard({ navigation }) {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
   const [orderType, setOrderType] = useState('take-away');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [lastCustomerName, setLastCustomerName] = useState('');
+  const [lastCustomerPhone, setLastCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [futureSale, setFutureSale] = useState({ name: '', address: '', city: '', phone: '', deliveryDate: '', deliveryTime: '' });
 
@@ -419,8 +423,8 @@ export default function CashierDashboard({ navigation }) {
       gst: 0,
       service_charge: 0,
       total_amount: finalTotal,
-      customer_name: orderType === 'delivery' ? futureSale.name : undefined,
-      customer_phone: orderType === 'delivery' ? futureSale.phone : undefined,
+      customer_name: orderType === 'delivery' ? futureSale.name : (orderType === 'take-away' ? (customerName.trim() || undefined) : undefined),
+      customer_phone: orderType === 'delivery' ? futureSale.phone : (orderType === 'take-away' ? (customerPhone.trim() || undefined) : undefined),
       delivery_address: orderType === 'delivery' ? futureSale.address : undefined,
       delivery_city: orderType === 'delivery' ? futureSale.city : undefined,
       timestamp: new Date().toISOString(),
@@ -445,6 +449,10 @@ export default function CashierDashboard({ navigation }) {
     setCart([]);
     setLastOrderType(orderType);
     setLastPaymentMethod(paymentMethod);
+    setLastCustomerName(customerName);
+    setLastCustomerPhone(customerPhone);
+    setCustomerName('');
+    setCustomerPhone('');
     setLastFutureSale({ ...futureSale });
     setFutureSale({ name: '', address: '', city: '', phone: '', deliveryDate: '', deliveryTime: '' });
     setExtraCharge('');
@@ -517,6 +525,8 @@ export default function CashierDashboard({ navigation }) {
               <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : orderType === 'delivery' ? 'Delivery' : 'Dine In'} | 
               <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
             </div>
+            ${customerName ? `<div><span class="bold">Customer: </span>${customerName}</div>` : ''}
+            ${customerPhone ? `<div><span class="bold">Phone: </span>${customerPhone}</div>` : ''}
             ${futureSale.name ? `<div><span class="bold">Future Sale:</span> ${futureSale.name}</div>` : ''}
             ${futureSale.phone ? `<div><span class="bold">Phone:</span> ${futureSale.phone}</div>` : ''}
             ${futureSale.address ? `<div><span class="bold">Address:</span> ${futureSale.address}</div>` : ''}
@@ -921,6 +931,27 @@ export default function CashierDashboard({ navigation }) {
                 <Text style={styles.reportBtnText}>Orders</Text>
               </TouchableOpacity>
             </View>
+
+            {orderType === 'take-away' && (
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TextInput
+                  style={[styles.searchInput, { flex: 1 }]}
+                  placeholder="Customer Name"
+                  placeholderTextColor="#9ca3af"
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                />
+                <TextInput
+                  style={[styles.searchInput, { flex: 1 }]}
+                  placeholder="Customer Phone Number"
+                  placeholderTextColor="#9ca3af"
+                  value={customerPhone}
+                  onChangeText={(text) => setCustomerPhone(text.replace(/[^0-9+ ]/g, ''))}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            )}
+
             <TextInput
               ref={productCodeRef}
               style={styles.searchInput}
@@ -1017,7 +1048,7 @@ export default function CashierDashboard({ navigation }) {
         <View style={[styles.rightPanel, { flex: isTablet ? rightFlex : 1 }]}>
           <View style={styles.cartHeaderTop}>
             <Text style={styles.cartHeaderTitle}>{t('cashier_current_order')}</Text>
-            <TouchableOpacity onPress={() => setCart([])} dataSet={{ hover: 'btn' }}>
+            <TouchableOpacity onPress={() => { setCart([]); setCustomerName(''); setCustomerPhone(''); }} dataSet={{ hover: 'btn' }}>
               <Text style={styles.clearText}>{t('cashier_clear')}</Text>
             </TouchableOpacity>
           </View>
@@ -1111,6 +1142,8 @@ export default function CashierDashboard({ navigation }) {
         lastCart={lastCart} 
         lastBillAmt={lastBillAmt}
         restaurantData={restaurantData}
+        lastCustomerName={lastCustomerName}
+        lastCustomerPhone={lastCustomerPhone}
       />
       <FutureSaleModal show={showFutureSaleModal} setShow={setShowFutureSaleModal} futureSale={futureSale} setFutureSale={setFutureSale} />
       

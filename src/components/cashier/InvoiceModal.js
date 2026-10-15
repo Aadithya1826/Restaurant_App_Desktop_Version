@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
-const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMethod, lastFutureSale, lastCart, lastBillAmt, restaurantData }) => {
+const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMethod, lastFutureSale, lastCart, lastBillAmt, restaurantData, lastCustomerName, lastCustomerPhone }) => {
   if (!show) return null;
   
   const currentDate = new Date().toLocaleString('en-US', {
@@ -45,6 +45,17 @@ const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMet
                 {lastPaymentMethod || 'Cash'}
               </Text>
             </View>
+
+            {lastCustomerName ? (
+              <View style={styles.infoRow}>
+                <Text style={styles.textNormal}>Customer: {lastCustomerName}</Text>
+              </View>
+            ) : null}
+            {lastCustomerPhone ? (
+              <View style={styles.infoRow}>
+                <Text style={styles.textNormal}>Phone: {lastCustomerPhone}</Text>
+              </View>
+            ) : null}
 
             {lastFutureSale && lastFutureSale.name ? (
               <View>
