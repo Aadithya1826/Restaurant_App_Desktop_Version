@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform, BackHandler, PanResponder, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, Alert, useWindowDimensions, Platform, BackHandler, PanResponder, Dimensions, DeviceEventEmitter } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { menuService, restaurantService } from '../services/api';
+import { menuService, restaurantService, newIdempotencyKey } from '../services/api';
 import api from '../services/api';
-import { backupData } from '../services/offlineSync';
+import { backupData, getSyncStats, processSyncQueue } from '../services/offlineSync';
+import { peekBillNumber, allocateBillNumber, getBusinessDate } from '../services/billCounter';
 import { LogOut, Trash2 } from 'lucide-react-native';
 import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
@@ -48,12 +49,15 @@ export default function CashierDashboard({ navigation }) {
   const [descriptionInput, setDescriptionInput] = useState('');
   const [lastAddedItemId, setLastAddedItemId] = useState(null);
 
-  const [billNo, setBillNo] = useState(() => {
-    const saved = localStorage.getItem('last_bill_no');
-    return saved ? parseInt(saved) : 1;
-  });
+  // The number the NEXT bill will receive. Resolved asynchronously from the
+  // durable, date-scoped counter (it resets to 1 at the start of each business
+  // day instead of carrying over from yesterday).
+  const [billNo, setBillNo] = useState(0);
   const [lastBillNo, setLastBillNo] = useState(0);
   const [lastBillAmt, setLastBillAmt] = useState(0);
+  // Pending/failed offline transactions, surfaced in the header so the counter
+  // staff can see at a glance that bills are still waiting to reach the server.
+  const [syncStatus, setSyncStatus] = useState({ pending: 0, failed: 0 });
   const [showInvoice, setShowInvoice] = useState(false);
   const [showFutureSaleModal, setShowFutureSaleModal] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
@@ -122,6 +126,36 @@ export default function CashierDashboard({ navigation }) {
       })
       .catch(err => console.error(err));
   }, [user]);
+
+  // Keep the offline-queue indicator up to date.
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const stats = await getSyncStats();
+      if (active) setSyncStatus({ pending: stats?.pending || 0, failed: stats?.failed || 0 });
+    };
+    refresh();
+    const sub = DeviceEventEmitter.addListener('offline_sync_status', (s) => {
+      if (active) setSyncStatus({ pending: s?.pending || 0, failed: s?.failed || 0 });
+    });
+    const id = setInterval(refresh, 10000);
+    return () => { active = false; clearInterval(id); sub.remove(); };
+  }, []);
+
+  // Resolve the next bill number on start-up, and re-check periodically so a
+  // terminal that is left running overnight rolls over to bill 1 on its own
+  // instead of continuing yesterday's sequence.
+  useEffect(() => {
+    let active = true;
+    const refreshBillNo = async () => {
+      const next = await peekBillNumber();
+      // Never move the displayed number backwards mid-sale.
+      if (active) setBillNo(prev => (prev === 0 || next !== prev ? next : prev));
+    };
+    refreshBillNo();
+    const id = setInterval(refreshBillNo, 60000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     const backAction = () => {
@@ -406,7 +440,7 @@ export default function CashierDashboard({ navigation }) {
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -414,7 +448,21 @@ export default function CashierDashboard({ navigation }) {
     const extraNum = parseFloat(extraCharge) || 0;
     const finalTotal = totalAmt + extraNum;
 
+    // Stable, globally-unique id generated on the terminal BEFORE the request.
+    // It is reused for every retry, so if the server already stored this sale
+    // (e.g. the response was lost to a dropped connection) it can recognise the
+    // replay instead of creating a second record. Bill numbers are local
+    // counters and are NOT unique across terminals, so they cannot do this job.
+    const clientOrderId = newIdempotencyKey();
+
+    // Atomically consume the next bill number for today's business date. The
+    // counter restarts at 1 each day, so a fresh day can no longer open at 800.
+    const businessDate = getBusinessDate();
+    const issuedBillNo = await allocateBillNumber(businessDate);
+    setBillNo(issuedBillNo + 1);
+
     const payload = {
+      client_order_id: clientOrderId,
       order_type: orderType === 'take-away' ? 'TAKEAWAY' : orderType === 'delivery' ? 'DELIVERY' : 'DINE_IN',
       table_number: orderType === 'take-away' ? 'takeaway' : '1',
       payment_method: paymentMethod,
@@ -428,23 +476,47 @@ export default function CashierDashboard({ navigation }) {
       delivery_address: orderType === 'delivery' ? futureSale.address : undefined,
       delivery_city: orderType === 'delivery' ? futureSale.city : undefined,
       timestamp: new Date().toISOString(),
-      bill_no: billNo,
+      business_date: businessDate,
+      bill_no: issuedBillNo,
     };
 
-    const dateStr = new Date().toISOString().split('T')[0];
-    backupData('Cashier', 'Receipts', `Receipt_${billNo}_${dateStr}.json`, payload);
+    const dateStr = businessDate;
+    // Local receipt backup is written FIRST and keyed by the unique client id,
+    // so no two bills can ever overwrite each other's backup file.
+    backupData('Cashier', 'Receipts', `Receipt_${dateStr}_${issuedBillNo}_${clientOrderId}.json`, payload);
 
-    api.post(`/api/v1/orders?restaurant_id=${user?.restaurant_id}`, payload)
-      .then(res => Alert.alert("Success", "Order placed successfully"))
-      .catch(err => Alert.alert("Error", "Failed to place order"));
+    api.post(`/api/v1/orders?restaurant_id=${user?.restaurant_id}`, payload, {
+      headers: { 'Idempotency-Key': clientOrderId },
+    })
+      .then(res => {
+        if (res?._offline || res?.data?._offline) {
+          // Safely stored on disk; the sync engine will push it when the
+          // connection returns. Tell the cashier the truth.
+          Alert.alert(
+            "Saved Offline",
+            `No internet connection. Bill ${payload.bill_no} has been saved on this computer and will be uploaded automatically once the connection is back. Do not re-enter it.`
+          );
+        } else {
+          Alert.alert("Success", "Order placed successfully");
+        }
+      })
+      .catch(err => {
+        // We could neither send NOR store the order. This must be loud: the
+        // old code printed the bill and silently discarded the sale.
+        Alert.alert(
+          "ORDER NOT SAVED",
+          `Bill ${payload.bill_no} could NOT be recorded (${err?.message || 'unknown error'}). ` +
+          `A local copy was written to the BackupData/Cashier/Receipts folder. Please re-enter this bill once the system is back online.`
+        );
+        if (window.electronAPI?.logError) {
+          window.electronAPI.logError(
+            `ORDER NOT SAVED bill_no=${payload.bill_no} client_order_id=${clientOrderId} total=${finalTotal} error=${err?.message}`
+          );
+        }
+      });
 
-    setLastBillNo(billNo);
+    setLastBillNo(issuedBillNo);
     setLastBillAmt(finalTotal);
-    setBillNo(prev => {
-      const next = prev + 1;
-      localStorage.setItem('last_bill_no', next.toString());
-      return next;
-    });
     setLastCart([...cart]);
     setCart([]);
     setLastOrderType(orderType);
@@ -491,7 +563,7 @@ export default function CashierDashboard({ navigation }) {
           </div>
           <div class="divider"></div>
           <div class="row">
-            <span class="bold">Bill No: ${billNo}</span>
+            <span class="bold">Bill No: ${issuedBillNo}</span>
             <span>${currentDate}</span>
           </div>
           <div>
@@ -518,7 +590,7 @@ export default function CashierDashboard({ navigation }) {
             </div>
             <div class="divider"></div>
             <div class="row">
-              <span class="bold">Bill No: ${billNo}</span>
+              <span class="bold">Bill No: ${issuedBillNo}</span>
               <span>${currentDate}</span>
             </div>
             <div>
@@ -892,7 +964,16 @@ export default function CashierDashboard({ navigation }) {
         </View>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.billNo}>Bill No: {billNo}</Text>
+          <Text style={styles.billNo}>Bill No: {billNo || '…'}</Text>
+          {(syncStatus.pending > 0 || syncStatus.failed > 0) && (
+            <TouchableOpacity onPress={() => processSyncQueue()}>
+              <Text style={[styles.syncBadge, syncStatus.failed > 0 && styles.syncBadgeError]}>
+                {syncStatus.failed > 0
+                  ? `⚠ ${syncStatus.failed} bill(s) REJECTED - check with admin`
+                  : `⏳ ${syncStatus.pending} bill(s) waiting to upload (tap to retry)`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.headerRight}>
@@ -1181,6 +1262,8 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 12, color: '#6b7280' },
   headerCenter: { flex: 1, alignItems: 'center' },
   billNo: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  syncBadge: { marginTop: 4, fontSize: 12, fontWeight: '600', color: '#92400e', backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  syncBadgeError: { color: '#991b1b', backgroundColor: '#fee2e2' },
   headerRight: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
   headerDate: { fontSize: 13, color: '#6b7280', marginRight: 16 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, cursor: 'pointer' },

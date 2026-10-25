@@ -8,10 +8,41 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://dev-api.dataudip
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  // Without a timeout a dead-but-not-refused connection (very common on a
+  // flaky restaurant link) hangs forever: the bill prints, the cashier moves
+  // on, and the sale is never queued nor sent.
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Auth endpoints must never be replayed from the offline queue.
+const NON_QUEUEABLE = [
+  '/api/v1/auth/login',
+  '/api/v1/auth/logout',
+  '/api/v1/auth/refresh',
+  '/api/v1/auth/signup',
+];
+
+export function newIdempotencyKey() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch (e) {}
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function logOfflineFailure(config, reason) {
+  const message = `OFFLINE WRITE FAILED ${config.method?.toUpperCase()} ${config.url}: ${reason} | body=${
+    typeof config.data === 'string' ? config.data.slice(0, 1000) : ''
+  }`;
+  console.error(`[Offline API] ${message}`);
+  try {
+    if (typeof window !== 'undefined' && window.electronAPI?.logError) {
+      await window.electronAPI.logError(message);
+    }
+  } catch (e) {}
+}
 
 export function rewriteImageUrl(url) {
   if (!url) return url;
@@ -25,11 +56,52 @@ export function rewriteImageUrl(url) {
   return cleanUrl;
 }
 
+/**
+ * Builds a stable key that includes the query string.
+ * axios only merges `config.params` into the URL inside the adapter, so
+ * `config.url` alone is NOT unique: every /api/v1/reports call with a
+ * different date was being written to the SAME cache file, which is why
+ * offline reports showed the wrong day's sales.
+ */
+function buildRequestKey(config) {
+  const url = config.url || '';
+  const params = config.params || {};
+  const keys = Object.keys(params).filter(k => params[k] !== undefined && params[k] !== null).sort();
+  if (!keys.length) return url;
+  const qs = keys.map(k => `${k}=${String(params[k])}`).join('&');
+  return url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`;
+}
+
+/** Merge `config.params` into the endpoint so a queued action keeps them. */
+function buildQueueEndpoint(config) {
+  return buildRequestKey(config);
+}
+
+function parseRequestBody(config) {
+  const data = config.data;
+  if (data === undefined || data === null || data === '') return {};
+  if (typeof data === 'object') return data; // already a plain object
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return null; // signals "not queueable"
+  }
+}
+
 api.interceptors.request.use(async (config) => {
   try {
     const token = await AsyncStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Stable idempotency key per logical request. If the request is retried
+    // (by us or by the offline queue) the server sees the same key and can
+    // refuse to create a second record for the same sale.
+    if (['post', 'patch', 'put', 'delete'].includes(config.method)) {
+      if (!config.headers['Idempotency-Key']) {
+        config.headers['Idempotency-Key'] = newIdempotencyKey();
+      }
     }
 
     const adminSelectedRestaurant = await AsyncStorage.getItem('admin_selected_restaurant');
@@ -52,31 +124,86 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
-    // Cache GET requests successfully fetched from server
-    if (response.config.method === 'get') {
-      cacheData(response.config.url, response.data);
+    // Cache GET requests successfully fetched from server (params included).
+    if (response.config.method === 'get' && response.status >= 200 && response.status < 300) {
+      cacheData(buildRequestKey(response.config), response.data);
     }
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
+    if (!originalRequest) return Promise.reject(error);
 
     if (originalRequest.url === '/api/v1/auth/refresh') {
       return Promise.reject(error);
     }
 
-    // Handle Network Errors (Offline Mode)
-    if (!error.response || error.code === 'ERR_NETWORK') {
+    const isNetworkFailure =
+      !error.response ||
+      error.code === 'ERR_NETWORK' ||
+      error.code === 'ECONNABORTED';
+
+    if (isNetworkFailure) {
       if (originalRequest.method === 'get') {
-        const cachedData = await getCachedData(originalRequest.url);
-        if (cachedData) {
+        const cached = await getCachedData(buildRequestKey(originalRequest));
+        if (cached) {
           console.log(`[Offline API] Served from cache: ${originalRequest.url}`);
-          return Promise.resolve({ data: cachedData, _offline: true });
+          return Promise.resolve({
+            data: cached.data,
+            status: 200,
+            config: originalRequest,
+            _offline: true,
+            _cachedAt: cached.cachedAt, // callers can warn "data as of ..."
+          });
         }
-      } else if (['post', 'patch', 'put', 'delete'].includes(originalRequest.method)) {
-        console.log(`[Offline API] Queued mutation: ${originalRequest.url}`);
-        await queueAction(originalRequest.url, originalRequest.method, JSON.parse(originalRequest.data || '{}'));
-        return Promise.resolve({ data: { success: true, _offline: true } });
+        // No cache: do NOT fabricate data, let the caller handle the failure.
+        return Promise.reject(error);
+      }
+
+      if (['post', 'patch', 'put', 'delete'].includes(originalRequest.method)) {
+        // Login/logout/refresh must never be queued and replayed.
+        if (NON_QUEUEABLE.some(p => (originalRequest.url || '').startsWith(p))) {
+          return Promise.reject(error);
+        }
+
+        // FormData (file uploads) cannot be serialised to the queue.
+        if (originalRequest.data instanceof FormData) {
+          return Promise.reject(error);
+        }
+
+        const body = parseRequestBody(originalRequest);
+        if (body === null) {
+          await logOfflineFailure(originalRequest, 'Unserialisable request body');
+          return Promise.reject(error);
+        }
+
+        const queued = await queueAction(
+          buildQueueEndpoint(originalRequest),
+          originalRequest.method,
+          body,
+          { idempotencyKey: originalRequest.headers?.['Idempotency-Key'] }
+        );
+
+        if (!queued?.success) {
+          // CRITICAL: the old code returned `{ success: true }` here no matter
+          // what, so a failed enqueue looked like a completed sale and the
+          // transaction vanished. Now we surface the failure.
+          await logOfflineFailure(originalRequest, queued?.error || 'queue failed');
+          const err = new Error('Offline save failed - transaction NOT recorded');
+          err.offlineQueueFailed = true;
+          err.config = originalRequest;
+          return Promise.reject(err);
+        }
+
+        console.log(`[Offline API] Queued mutation ${queued.id}: ${originalRequest.url}`);
+        return Promise.resolve({
+          data: { success: true, _offline: true, _queueId: queued.id },
+          status: 202,
+          config: originalRequest,
+          _offline: true,
+          _queued: true,
+          _queueId: queued.id,
+        });
       }
     }
 
@@ -87,7 +214,7 @@ api.interceptors.response.use(
         if (refreshResponse.data.access_token) {
           await AsyncStorage.setItem('access_token', refreshResponse.data.access_token);
           await AsyncStorage.setItem('user', JSON.stringify(refreshResponse.data.user));
-          
+
           originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access_token}`;
           return api(originalRequest);
         }
