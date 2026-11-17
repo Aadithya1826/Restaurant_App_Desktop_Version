@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
-import { isAcOrder, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml } from '../../utils/reportUtils';
+import { isAcOrder, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml, formatHourTo12, mergeServerAndLocalOrders } from '../../utils/reportUtils';
 
 const AcReportModal = ({ show, setShow, restaurantData, api, user, onShowBill }) => {
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -46,20 +46,9 @@ const AcReportModal = ({ show, setShow, restaurantData, api, user, onShowBill })
       const serverAcOrders = serverOrders.filter(order => isAcOrder(order, localAcMap));
 
       // 3. Merge server and local orders (avoid duplicates)
-      const mergedMap = new Map();
-      serverAcOrders.forEach(o => {
-        const key = String(o.bill_no || o.order_id || o.branch_order_id);
-        mergedMap.set(key, o);
-      });
+      const mergedOrders = mergeServerAndLocalOrders(serverAcOrders, localDateAcBills, reportDate);
 
-      localDateAcBills.forEach(o => {
-        const key = String(o.bill_no || o.order_id);
-        if (!mergedMap.has(key)) {
-          mergedMap.set(key, o);
-        }
-      });
-
-      const mergedList = Array.from(mergedMap.values()).sort((a, b) => {
+      const mergedList = mergedOrders.sort((a, b) => {
         const timeA = new Date(a.created_at || a.timestamp || 0).getTime();
         const timeB = new Date(b.created_at || b.timestamp || 0).getTime();
         return timeB - timeA; // Newest first for list
@@ -185,7 +174,7 @@ const AcReportModal = ({ show, setShow, restaurantData, api, user, onShowBill })
                 if (rawTime) {
                   try {
                     const d = new Date(rawTime.includes('Z') || rawTime.includes('+') ? rawTime : rawTime + 'Z');
-                    formattedTime = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    formattedTime = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                   } catch (e) {}
                 }
 

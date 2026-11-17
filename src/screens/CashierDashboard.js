@@ -12,7 +12,7 @@ import FutureSaleModal from '../components/cashier/FutureSaleModal';
 import OrderHistoryModal from '../components/cashier/OrderHistoryModal';
 import DateRangeModal from '../components/cashier/DateRangeModal';
 import AcReportModal from '../components/cashier/AcReportModal';
-import { isAcOrder, saveLocalBill, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml } from '../utils/reportUtils';
+import { isAcOrder, saveLocalBill, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml, formatHourTo12, mergeServerAndLocalOrders } from '../utils/reportUtils';
 import VoiceWidget from '../components/VoiceWidget';
 import { Picker } from '@react-native-picker/picker';
 
@@ -763,46 +763,35 @@ export default function CashierDashboard({ navigation }) {
         if (b.is_ac) localAcMap[String(b.bill_no || b.order_id || '')] = true;
       });
 
-      let orders = [];
-      try {
-        let orderParams = `date=${targetDate}&restaurant_id=${user?.restaurant_id || ''}`;
-        const ordersRes = await api.get(`/api/v1/orders?${orderParams}`);
-        orders = Array.isArray(ordersRes.data) ? ordersRes.data : (ordersRes.data?.data || []);
-      } catch (err) {
-        console.warn('Could not fetch server orders, using local bills', err);
-      }
-
-      const mergedMap = new Map();
-      orders.forEach(o => mergedMap.set(String(o.bill_no || o.order_id || o.branch_order_id), o));
-      localBills.filter(b => {
-        const bDate = b.date || (b.timestamp ? b.timestamp.split('T')[0] : '');
-        if (startDate && endDate) {
-          return bDate >= startDate && bDate <= endDate;
-        }
-        return bDate === targetDate;
-      }).forEach(b => {
-        const k = String(b.bill_no || b.order_id);
-        if (!mergedMap.has(k)) mergedMap.set(k, b);
-      });
-      const allOrders = Array.from(mergedMap.values());
-
-      let filteredOrders = [];
+      // 1. If AC filter is requested:
       if (acFilter === 'ac') {
-        filteredOrders = allOrders.filter(o => isAcOrder(o, localAcMap));
-      } else {
-        filteredOrders = allOrders.filter(o => !isAcOrder(o, localAcMap));
-      }
+        let serverOrders = [];
+        try {
+          const orderParams = `date=${targetDate}&restaurant_id=${user?.restaurant_id || ''}`;
+          const ordersRes = await api.get(`/api/v1/orders?${orderParams}`);
+          serverOrders = Array.isArray(ordersRes.data) ? ordersRes.data : (ordersRes.data?.data || []);
+        } catch (err) {
+          console.warn('Could not fetch server orders for AC report, using local bills', err);
+        }
 
-      if (filteredOrders.length > 0) {
-        const reportData = buildReportFromOrders(filteredOrders, type, restaurantData, targetDate, acFilter);
-        const printContent = generateReportHtml(reportData, type, acFilter);
+        const mergedOrders = mergeServerAndLocalOrders(serverOrders, localBills, targetDate, startDate, endDate);
+        const acOrders = mergedOrders.filter(o => isAcOrder(o, localAcMap));
+
+        if (acOrders.length === 0) {
+          alert("No A/C bills found for this date to generate report.");
+          return;
+        }
+
+        const reportData = buildReportFromOrders(acOrders, type, restaurantData, targetDate, 'ac');
+        const printContent = generateReportHtml(reportData, type, 'ac');
         printReportHtml(printContent, () => {
           setTimeout(() => { productCodeRef.current?.focus(); }, 100);
         });
         return;
       }
 
-      // Fallback to server endpoint if filtered orders list is empty
+      // 2. Regular (General / Non-AC) report:
+      // Primary: Query the server report endpoint directly (DB is source of truth and has exact totals)
       let params = `restaurant_id=${user?.restaurant_id || ''}`;
       if (startDate && endDate) {
         params += `&start_date=${startDate}&end_date=${endDate}`;
@@ -810,18 +799,53 @@ export default function CashierDashboard({ navigation }) {
         params += `&date=${targetDate}`;
       }
 
-      let data;
-      if (type === 'hourly') {
-        const res = await api.get(`/api/v1/reports/hourly?${params}`);
-        data = res.data;
-      } else {
-        const res = await api.get(`/api/v1/reports/items?${params}`);
-        data = res.data;
+      let data = null;
+      try {
+        if (type === 'hourly') {
+          const res = await api.get(`/api/v1/reports/hourly?${params}`);
+          data = res.data;
+        } else {
+          const res = await api.get(`/api/v1/reports/items?${params}`);
+          data = res.data;
+        }
+      } catch (apiErr) {
+        console.warn('Server report endpoint failed, falling back to local orders', apiErr);
       }
 
-      data.restaurant = data.restaurant || restaurantData;
-      data.acMode = acFilter;
-      const printContent = generateReportHtml(data, type, acFilter);
+      if (data) {
+        data.restaurant = data.restaurant || restaurantData;
+        data.acMode = 'non-ac';
+        if (type === 'hourly' && Array.isArray(data.timeline)) {
+          data.timeline = data.timeline.map(t => ({
+            ...t,
+            time: formatHourTo12(t.time)
+          }));
+        }
+        const printContent = generateReportHtml(data, type, 'non-ac');
+        printReportHtml(printContent, () => {
+          setTimeout(() => { productCodeRef.current?.focus(); }, 100);
+        });
+        return;
+      }
+
+      // 3. Fallback when server report endpoint is unavailable (e.g. offline):
+      let serverOrders = [];
+      try {
+        const orderParams = `date=${targetDate}&restaurant_id=${user?.restaurant_id || ''}`;
+        const ordersRes = await api.get(`/api/v1/orders?${orderParams}`);
+        serverOrders = Array.isArray(ordersRes.data) ? ordersRes.data : (ordersRes.data?.data || []);
+      } catch (err) {}
+
+      const mergedOrders = mergeServerAndLocalOrders(serverOrders, localBills, targetDate, startDate, endDate);
+      const regularOrders = mergedOrders.filter(o => !isAcOrder(o, localAcMap));
+
+      if (regularOrders.length === 0) {
+        alert("No bills found for this date to generate report.");
+        return;
+      }
+
+      const reportData = buildReportFromOrders(regularOrders, type, restaurantData, targetDate, 'non-ac');
+      const printContent = generateReportHtml(reportData, type, 'non-ac');
       printReportHtml(printContent, () => {
         setTimeout(() => { productCodeRef.current?.focus(); }, 100);
       });

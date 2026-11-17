@@ -1,6 +1,103 @@
 // src/utils/reportUtils.js
 
 /**
+ * Converts a 24-hour time or time range to 12-hour AM/PM format.
+ * Examples:
+ *  "00:00 - 01:00" -> "12:00 AM - 01:00 AM"
+ *  "09:00 - 10:00" -> "09:00 AM - 10:00 AM"
+ *  "13:00 - 14:00" -> "01:00 PM - 02:00 PM"
+ *  "14:00:00"      -> "02:00 PM"
+ *  "09:00 AM"      -> "09:00 AM" (leaves as-is)
+ */
+export const formatHourTo12 = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return timeStr || '';
+  if (/am|pm/i.test(timeStr)) return timeStr;
+
+  const convertSingle = (str) => {
+    const trimmed = str.trim();
+    const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/);
+    if (!match) return trimmed;
+    let hour = parseInt(match[1], 10);
+    const minute = match[2] || '00';
+    if (isNaN(hour)) return trimmed;
+
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    const hourStr = String(hour).padStart(2, '0');
+    return `${hourStr}:${minute} ${ampm}`;
+  };
+
+  if (timeStr.includes('-')) {
+    const parts = timeStr.split('-');
+    if (parts.length === 2 && /\d/.test(parts[0]) && /\d/.test(parts[1])) {
+      return `${convertSingle(parts[0])} - ${convertSingle(parts[1])}`;
+    }
+  }
+
+  return convertSingle(timeStr);
+};
+
+/**
+ * Merges server orders and local cached bills without ANY duplicate counting.
+ * Server orders are treated as the authoritative source of truth.
+ * Local bills are only added if they have not yet synced to the server.
+ */
+export const mergeServerAndLocalOrders = (serverOrders = [], localBills = [], targetDate, startDate, endDate) => {
+  const isDateMatch = (b) => {
+    const bDate = b.date || (b.timestamp ? b.timestamp.split('T')[0] : '');
+    if (startDate && endDate) {
+      return bDate >= startDate && bDate <= endDate;
+    }
+    return !targetDate || bDate === targetDate;
+  };
+
+  const seenClientOrderIds = new Set();
+  const seenBillNos = new Set();
+  const seenOrderIds = new Set();
+  const seenFingerprints = new Set();
+  const result = [];
+
+  const addOrder = (o) => {
+    if (!o) return false;
+    const cid = o.client_order_id ? String(o.client_order_id).trim() : null;
+    const bno = (o.bill_no !== undefined && o.bill_no !== null && o.bill_no !== '') ? String(o.bill_no).trim() : null;
+    const broid = (o.branch_order_id !== undefined && o.branch_order_id !== null && o.branch_order_id !== '') ? String(o.branch_order_id).trim() : null;
+    const oid = (o.order_id !== undefined && o.order_id !== null && o.order_id !== '') ? String(o.order_id).trim() : null;
+    const id = (o.id !== undefined && o.id !== null && o.id !== '') ? String(o.id).trim() : null;
+
+    const timeVal = o.created_at || o.timestamp || '';
+    const amtVal = parseFloat(o.total_amount) || 0;
+    const fingerprint = timeVal && amtVal ? `${timeVal.slice(0, 19)}_${amtVal.toFixed(2)}` : null;
+
+    if (cid && seenClientOrderIds.has(cid)) return false;
+    if (bno && seenBillNos.has(bno)) return false;
+    if (broid && seenBillNos.has(broid)) return false;
+    if (oid && seenOrderIds.has(oid)) return false;
+    if (id && seenOrderIds.has(id)) return false;
+    if (fingerprint && seenFingerprints.has(fingerprint)) return false;
+
+    if (cid) seenClientOrderIds.add(cid);
+    if (bno) { seenBillNos.add(bno); seenOrderIds.add(bno); }
+    if (broid) { seenBillNos.add(broid); seenOrderIds.add(broid); }
+    if (oid) seenOrderIds.add(oid);
+    if (id) seenOrderIds.add(id);
+    if (fingerprint) seenFingerprints.add(fingerprint);
+
+    result.push(o);
+    return true;
+  };
+
+  // 1. Authoritative server orders first
+  (serverOrders || []).forEach(o => addOrder(o));
+
+  // 2. Unsynced local bills only
+  (localBills || []).filter(isDateMatch).forEach(b => addOrder(b));
+
+  return result;
+};
+
+/**
  * Checks whether an order is marked as an AC bill.
  * Uses multiple indicators to ensure reliable detection:
  * 1. Explicit `is_ac` flag on order
@@ -41,10 +138,20 @@ export const saveLocalBill = (bill, restaurantId) => {
   try {
     const key = `local_bills_${restaurantId || 'default'}`;
     const existing = getLocalBills(restaurantId);
-    existing.unshift(bill);
-    // Keep max 1000 recent bills
-    if (existing.length > 1000) existing.length = 1000;
-    localStorage.setItem(key, JSON.stringify(existing));
+    const billCid = bill.client_order_id ? String(bill.client_order_id) : null;
+    const billNo = bill.bill_no !== undefined ? String(bill.bill_no) : null;
+
+    const alreadyExists = existing.some(b => {
+      if (billCid && b.client_order_id && String(b.client_order_id) === billCid) return true;
+      if (billNo && b.bill_no !== undefined && String(b.bill_no) === billNo && (b.date === bill.date || b.timestamp === bill.timestamp)) return true;
+      return false;
+    });
+
+    if (!alreadyExists) {
+      existing.unshift(bill);
+      if (existing.length > 1000) existing.length = 1000;
+      localStorage.setItem(key, JSON.stringify(existing));
+    }
   } catch (e) {
     console.error('Failed to save local bill', e);
   }
@@ -94,16 +201,21 @@ export const buildReportFromOrders = (orders, type, restaurantData, dateStr, acM
           hour = d.getHours();
         }
       }
-      const nextHour = (hour + 1) % 24;
-      const pad = (n) => String(n).padStart(2, '0');
-      const slotKey = `${pad(hour)}:00 - ${pad(nextHour)}:00`;
-      hourMap[slotKey] = (hourMap[slotKey] || 0) + (parseFloat(order.total_amount) || 0);
+      hourMap[hour] = (hourMap[hour] || 0) + (parseFloat(order.total_amount) || 0);
     });
 
-    const timeline = Object.keys(hourMap).sort().map(slot => ({
-      time: slot,
-      sales: hourMap[slot]
-    }));
+    const timeline = Object.keys(hourMap)
+      .map(h => parseInt(h, 10))
+      .sort((a, b) => a - b)
+      .map(hour => {
+        const nextHour = (hour + 1) % 24;
+        const pad = (n) => String(n).padStart(2, '0');
+        const rawSlot = `${pad(hour)}:00 - ${pad(nextHour)}:00`;
+        return {
+          time: formatHourTo12(rawSlot),
+          sales: hourMap[hour]
+        };
+      });
 
     return {
       restaurant: restaurantData,
@@ -160,7 +272,7 @@ export const generateReportHtml = (data, type, acMode = 'non-ac') => {
   if (type === 'hourly') {
     tableRows = (data.timeline || []).filter(t => Math.round(t.sales) > 0).map(t => `
       <div class="row">
-        <span>${t.time}</span>
+        <span>${formatHourTo12(t.time)}</span>
         <span>${Math.round(t.sales)}</span>
       </div>
     `).join('');
@@ -212,8 +324,8 @@ export const generateReportHtml = (data, type, acMode = 'non-ac') => {
             ${type === 'hourly' 
               ? `<p>Date: ${data.date}</p>` 
               : `<p>Print Date: ${data.date}</p><p>Bills From: ${data.date}</p><p>To: ${data.date}</p>`}
-            <p>Starting BillNo: ${(data.starting_bill && data.starting_bill.no) || '-'} - ${(data.starting_bill && data.starting_bill.time) || '-'}</p>
-            <p>Ending BillNo: ${(data.ending_bill && data.ending_bill.no) || '-'} - ${(data.ending_bill && data.ending_bill.time) || '-'}</p>
+            <p>Starting BillNo: ${(data.starting_bill && data.starting_bill.no) || '-'} - ${formatHourTo12((data.starting_bill && data.starting_bill.time) || '-')}</p>
+            <p>Ending BillNo: ${(data.ending_bill && data.ending_bill.no) || '-'} - ${formatHourTo12((data.ending_bill && data.ending_bill.time) || '-')}</p>
           </div>
         </div>
         

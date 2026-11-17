@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { ArrowLeft, Printer, Activity } from 'lucide-react-native';
 import { reportsService } from '../services/api';
 import api from '../services/api';
-import { isAcOrder, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml } from '../utils/reportUtils';
+import { isAcOrder, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml, formatHourTo12, mergeServerAndLocalOrders } from '../utils/reportUtils';
 
 export default function ReportView({ type, onBack }) {
   const [reportData, setReportData] = useState(null);
@@ -36,18 +36,18 @@ export default function ReportView({ type, onBack }) {
             if (b.is_ac) localAcMap[String(b.bill_no || b.order_id || '')] = true;
           });
 
-          const mergedMap = new Map();
-          orders.forEach(o => mergedMap.set(String(o.bill_no || o.order_id || o.branch_order_id), o));
-          localBills.filter(b => (b.date === selectedDate || b.timestamp?.startsWith(selectedDate))).forEach(b => {
-            const k = String(b.bill_no || b.order_id);
-            if (!mergedMap.has(k)) mergedMap.set(k, b);
-          });
-
-          const acOrders = Array.from(mergedMap.values()).filter(o => isAcOrder(o, localAcMap));
+          const mergedOrders = mergeServerAndLocalOrders(orders, localBills, selectedDate);
+          const acOrders = mergedOrders.filter(o => isAcOrder(o, localAcMap));
           const built = buildReportFromOrders(acOrders, acSubtype, null, selectedDate, 'ac');
           setReportData(built);
         } else if (type === 'hourly') {
           const res = await reportsService.getHourlyReport({ date: selectedDate });
+          if (res && Array.isArray(res.timeline)) {
+            res.timeline = res.timeline.map(t => ({
+              ...t,
+              time: formatHourTo12(t.time)
+            }));
+          }
           setReportData(res);
         } else if (type === 'item') {
           const res = await reportsService.getItemWiseReport({ date: selectedDate });
@@ -223,7 +223,7 @@ export default function ReportView({ type, onBack }) {
                 ) : (
                   timelineList.map((t, idx) => (
                     <View key={idx} style={styles.tableRow}>
-                      <Text style={[styles.td, { flex: 1, fontWeight: '500' }]}>{t.time}</Text>
+                      <Text style={[styles.td, { flex: 1, fontWeight: '500' }]}>{formatHourTo12(t.time)}</Text>
                       <Text style={[styles.td, { flex: 1, textAlign: 'right' }]}>{Math.round(t.sales)}</Text>
                     </View>
                   ))
