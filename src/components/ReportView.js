@@ -2,19 +2,51 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Platform, createElement } from 'react-native';
 import { ArrowLeft, Printer, Activity } from 'lucide-react-native';
 import { reportsService } from '../services/api';
+import api from '../services/api';
+import { isAcOrder, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml } from '../utils/reportUtils';
 
 export default function ReportView({ type, onBack }) {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [acSubtype, setAcSubtype] = useState('item'); // 'item' or 'hourly' for AC mode
+
+  const isAc = type === 'ac';
+  const effectiveType = isAc ? acSubtype : type;
 
   useEffect(() => {
     const fetchReport = async () => {
       try {
         setLoading(true);
         setError(null);
-        if (type === 'hourly') {
+
+        if (isAc) {
+          let orders = [];
+          try {
+            const res = await api.get(`/api/v1/orders?date=${selectedDate}`);
+            orders = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          } catch (e) {
+            console.warn('Using local bills for AC report in ReportView', e);
+          }
+
+          const localBills = getLocalBills();
+          const localAcMap = {};
+          localBills.forEach(b => {
+            if (b.is_ac) localAcMap[String(b.bill_no || b.order_id || '')] = true;
+          });
+
+          const mergedMap = new Map();
+          orders.forEach(o => mergedMap.set(String(o.bill_no || o.order_id || o.branch_order_id), o));
+          localBills.filter(b => (b.date === selectedDate || b.timestamp?.startsWith(selectedDate))).forEach(b => {
+            const k = String(b.bill_no || b.order_id);
+            if (!mergedMap.has(k)) mergedMap.set(k, b);
+          });
+
+          const acOrders = Array.from(mergedMap.values()).filter(o => isAcOrder(o, localAcMap));
+          const built = buildReportFromOrders(acOrders, acSubtype, null, selectedDate, 'ac');
+          setReportData(built);
+        } else if (type === 'hourly') {
           const res = await reportsService.getHourlyReport({ date: selectedDate });
           setReportData(res);
         } else if (type === 'item') {
@@ -28,96 +60,15 @@ export default function ReportView({ type, onBack }) {
       }
     };
     fetchReport();
-  }, [type, selectedDate]);
+  }, [type, selectedDate, acSubtype]);
 
   const handlePrint = () => {
-    if (Platform.OS !== 'web') return; // If mobile, use a different print strategy if needed
-    
-    let tableRows = '';
-    if (type === 'hourly') {
-      tableRows = reportData.timeline.map(t => `
-        <div class="row">
-          <span>${t.time}</span>
-          <span>${Math.round(t.sales)}</span>
-        </div>
-      `).join('');
-    } else {
-      tableRows = reportData.items.map(item => `
-        <div class="item-row">
-          <span class="item-name">${item.name}</span>
-          <span class="item-qty">${item.qty.toFixed(2)}</span>
-          <span class="item-amt">${item.amount.toFixed(2)}</span>
-        </div>
-      `).join('');
-    }
+    if (Platform.OS !== 'web') return;
+    if (!reportData) return;
 
-    const itemHeader = type === 'hourly' ? '' : `
-      <div class="item-row" style="border-bottom: 1px dashed #000; border-top: 1px dashed #000; padding: 5px 0; margin-bottom: 5px; font-weight: bold;">
-        <span class="item-name">Item Name</span>
-        <span class="item-qty">Qty</span>
-        <span class="item-amt">Amount</span>
-      </div>
-    `;
-
-    const printContent = `
-      <html>
-        <head>
-          <title>Print Receipt</title>
-          <style>
-            @page { margin: 0; }
-            body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; width: 72mm; box-sizing: border-box; color: #000; }
-            .header { text-align: center; margin-bottom: 10px; }
-            .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; }
-            .header p { margin: 0 0 4px 0; text-transform: uppercase; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .item-name { flex: 2; word-break: break-word; padding-right: 5px; }
-            .item-qty { flex: 1; text-align: right; }
-            .item-amt { flex: 1; text-align: right; }
-            .total-row { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${reportData.restaurant?.name || 'DATAUDIPI HOTEL'}</h1>
-            <p>${reportData.restaurant?.address || 'MUGALIVAKKAM, CHENNAI'}</p>
-            <p>PH:${reportData.restaurant?.phone || '9597066563'} GSTIN: ${reportData.restaurant?.gstin || '33ADLPV4810B3ZQ'}</p>
-            <h2 style="font-size: 14px; margin: 10px 0 5px 0;">${type === 'hourly' ? 'HOURLY REPORT' : 'ITEM WISE REPORT'}</h2>
-            <div style="text-align: left; margin-top: 10px;">
-              ${type === 'hourly' 
-                ? `<p>Date: ${reportData.date}</p>` 
-                : `<p>Print Date: ${reportData.date}</p><p>Bills From: ${reportData.date}</p><p>To: ${reportData.date}</p>`}
-              <p>Starting BillNo: ${reportData.starting_bill?.no || '-'} - ${reportData.starting_bill?.time || '-'}</p>
-              <p>Ending BillNo: ${reportData.ending_bill?.no || '-'} - ${reportData.ending_bill?.time || '-'}</p>
-            </div>
-          </div>
-          
-          ${itemHeader}
-          ${tableRows}
-          
-          <div class="total-row">
-            <span>TOTAL SALES</span>
-            <span>${reportData.total_sales.toFixed(2)}</span>
-          </div>
-        </body>
-      </html>
-    `;
-
-    if (window.electronAPI && window.electronAPI.printSilent) {
-      window.electronAPI.printSilent(printContent);
-    } else {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      iframe.contentWindow.document.open();
-      iframe.contentWindow.document.write(printContent);
-      iframe.contentWindow.document.close();
-      iframe.contentWindow.focus();
-      setTimeout(() => {
-        iframe.contentWindow.print();
-        document.body.removeChild(iframe);
-      }, 250);
-    }
+    const acMode = isAc ? 'ac' : 'non-ac';
+    const printContent = generateReportHtml(reportData, effectiveType, acMode);
+    printReportHtml(printContent);
   };
 
   if (loading && !reportData) {
@@ -140,6 +91,14 @@ export default function ReportView({ type, onBack }) {
     );
   }
 
+  const reportTitle = isAc 
+    ? `AC - ${effectiveType === 'hourly' ? 'Hourly Sales Report' : 'Item Wise Sales Report'}`
+    : (effectiveType === 'hourly' ? 'NON-AC - Hourly Sales Report' : 'NON-AC - Item Wise Sales Report');
+
+  const totalSalesVal = reportData?.total_sales !== undefined ? Number(reportData.total_sales).toFixed(2) : '0.00';
+  const itemsList = reportData?.items || [];
+  const timelineList = reportData?.timeline || [];
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -149,7 +108,14 @@ export default function ReportView({ type, onBack }) {
             <ArrowLeft size={20} color="#111" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.title}>{type === 'hourly' ? 'Hourly Sales Report' : 'Item Wise Sales Report'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.title}>{reportTitle}</Text>
+              <View style={[styles.badge, isAc ? styles.acBadge : styles.nonAcBadge]}>
+                <Text style={[styles.badgeText, isAc ? styles.acBadgeText : styles.nonAcBadgeText]}>
+                  {isAc ? 'AC BILLS' : 'NON-AC'}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.subtitle}>
               Date: {reportData?.date || selectedDate} | Starting Bill: {reportData?.starting_bill?.no || '-'} | Ending Bill: {reportData?.ending_bill?.no || '-'}
             </Text>
@@ -157,6 +123,23 @@ export default function ReportView({ type, onBack }) {
         </View>
 
         <View style={styles.headerRight}>
+          {isAc && (
+            <View style={styles.subtypeSelector}>
+              <TouchableOpacity 
+                style={[styles.subtypeBtn, acSubtype === 'item' && styles.activeSubtypeBtn]} 
+                onPress={() => setAcSubtype('item')}
+              >
+                <Text style={[styles.subtypeText, acSubtype === 'item' && styles.activeSubtypeText]}>Item Wise</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.subtypeBtn, acSubtype === 'hourly' && styles.activeSubtypeBtn]} 
+                onPress={() => setAcSubtype('hourly')}
+              >
+                <Text style={[styles.subtypeText, acSubtype === 'hourly' && styles.activeSubtypeText]}>Hourly</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {Platform.OS === 'web' ? (
             createElement('input', {
               type: 'date',
@@ -170,7 +153,8 @@ export default function ReportView({ type, onBack }) {
                 outline: 'none',
                 fontFamily: 'inherit',
                 fontSize: '14px',
-                marginRight: '8px'
+                marginRight: '8px',
+                cursor: 'pointer'
               }
             })
           ) : (
@@ -195,18 +179,18 @@ export default function ReportView({ type, onBack }) {
             <View style={styles.statsRow}>
               <View style={styles.statCard}>
                 <Text style={styles.statLabel}>Total Sales</Text>
-                <Text style={styles.statValue}>₹{reportData.total_sales.toFixed(2)}</Text>
+                <Text style={[styles.statValue, isAc && { color: '#0284c7' }]}>₹{totalSalesVal}</Text>
               </View>
-              {type === 'item' && (
+              {effectiveType === 'item' && (
                 <>
                   <View style={styles.statCard}>
                     <Text style={styles.statLabel}>Total Items Types Sold</Text>
-                    <Text style={styles.statValue}>{reportData.items.length}</Text>
+                    <Text style={styles.statValue}>{itemsList.length}</Text>
                   </View>
                   <View style={styles.statCard}>
                     <Text style={styles.statLabel}>Total Quantity Sold</Text>
                     <Text style={styles.statValue}>
-                      {reportData.items.reduce((acc, curr) => acc + curr.qty, 0).toFixed(0)}
+                      {itemsList.reduce((acc, curr) => acc + (parseFloat(curr.qty) || 0), 0).toFixed(0)}
                     </Text>
                   </View>
                 </>
@@ -216,7 +200,7 @@ export default function ReportView({ type, onBack }) {
             {/* Table */}
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                {type === 'hourly' ? (
+                {effectiveType === 'hourly' ? (
                   <>
                     <Text style={[styles.th, { flex: 1 }]}>Timeline</Text>
                     <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>Sales Amount (₹)</Text>
@@ -231,22 +215,36 @@ export default function ReportView({ type, onBack }) {
                 )}
               </View>
               
-              {type === 'hourly' ? (
-                reportData.timeline.map((t, idx) => (
-                  <View key={idx} style={styles.tableRow}>
-                    <Text style={[styles.td, { flex: 1, fontWeight: '500' }]}>{t.time}</Text>
-                    <Text style={[styles.td, { flex: 1, textAlign: 'right' }]}>{Math.round(t.sales)}</Text>
+              {effectiveType === 'hourly' ? (
+                timelineList.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#94a3b8' }}>No sales recorded for this date.</Text>
                   </View>
-                ))
+                ) : (
+                  timelineList.map((t, idx) => (
+                    <View key={idx} style={styles.tableRow}>
+                      <Text style={[styles.td, { flex: 1, fontWeight: '500' }]}>{t.time}</Text>
+                      <Text style={[styles.td, { flex: 1, textAlign: 'right' }]}>{Math.round(t.sales)}</Text>
+                    </View>
+                  ))
+                )
               ) : (
-                reportData.items.map((item, idx) => (
-                  <View key={idx} style={styles.tableRow}>
-                    <Text style={[styles.td, { flex: 2, fontWeight: '500' }]}>{item.name}</Text>
-                    <Text style={[styles.td, { flex: 1, textAlign: 'right', color: '#64748b' }]}>{item.rate.toFixed(2)}</Text>
-                    <Text style={[styles.td, { flex: 1, textAlign: 'right', color: '#64748b' }]}>{item.qty.toFixed(2)}</Text>
-                    <Text style={[styles.td, { flex: 1, textAlign: 'right', fontWeight: 'bold' }]}>{item.amount.toFixed(2)}</Text>
+                itemsList.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#94a3b8' }}>No items sold for this date.</Text>
                   </View>
-                ))
+                ) : (
+                  itemsList.map((item, idx) => (
+                    <View key={idx} style={styles.tableRow}>
+                      <Text style={[styles.td, { flex: 2, fontWeight: '500' }]}>{item.name}</Text>
+                      <Text style={[styles.td, { flex: 1, textAlign: 'right', color: '#64748b' }]}>
+                        {item.rate !== undefined ? item.rate.toFixed(2) : (item.qty ? (item.amount / item.qty).toFixed(2) : '-')}
+                      </Text>
+                      <Text style={[styles.td, { flex: 1, textAlign: 'right', color: '#64748b' }]}>{Number(item.qty).toFixed(0)}</Text>
+                      <Text style={[styles.td, { flex: 1, textAlign: 'right', fontWeight: 'bold' }]}>{item.amount.toFixed(2)}</Text>
+                    </View>
+                  ))
+                )
               )}
             </View>
           </>
@@ -269,8 +267,19 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 4 },
   subtitle: { fontSize: 14, color: '#64748b' },
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  acBadge: { backgroundColor: '#e0f2fe', borderColor: '#38bdf8' },
+  acBadgeText: { color: '#0369a1', fontSize: 11, fontWeight: 'bold' },
+  nonAcBadge: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' },
+  nonAcBadgeText: { color: '#475569', fontSize: 11, fontWeight: 'bold' },
   
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  subtypeSelector: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: '#e2e8f0' },
+  subtypeBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  activeSubtypeBtn: { backgroundColor: '#0284c7' },
+  subtypeText: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  activeSubtypeText: { color: '#ffffff', fontWeight: 'bold' },
+
   dateBadge: { backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, fontWeight: '500', color: '#0f172a' },
   printBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#111', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6 },
   printBtnText: { fontWeight: '500', color: '#111' },

@@ -11,6 +11,8 @@ import InvoiceModal from '../components/cashier/InvoiceModal';
 import FutureSaleModal from '../components/cashier/FutureSaleModal';
 import OrderHistoryModal from '../components/cashier/OrderHistoryModal';
 import DateRangeModal from '../components/cashier/DateRangeModal';
+import AcReportModal from '../components/cashier/AcReportModal';
+import { isAcOrder, saveLocalBill, getLocalBills, buildReportFromOrders, generateReportHtml, printReportHtml } from '../utils/reportUtils';
 import VoiceWidget from '../components/VoiceWidget';
 import { Picker } from '@react-native-picker/picker';
 
@@ -62,8 +64,11 @@ export default function CashierDashboard({ navigation }) {
   const [showFutureSaleModal, setShowFutureSaleModal] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showAcReportModal, setShowAcReportModal] = useState(false);
   const [dateRangeReportType, setDateRangeReportType] = useState('items');
+  const [dateRangeAcFilter, setDateRangeAcFilter] = useState('non-ac');
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
+  const [lastIsAC, setLastIsAC] = useState(false);
 
   const [orderType, setOrderType] = useState('take-away');
   const [customerName, setCustomerName] = useState('');
@@ -162,6 +167,7 @@ export default function CashierDashboard({ navigation }) {
       if (showInvoice) { setShowInvoice(false); return true; }
       if (showFutureSaleModal) { setShowFutureSaleModal(false); return true; }
       if (showOrderHistory) { setShowOrderHistory(false); return true; }
+      if (showAcReportModal) { setShowAcReportModal(false); return true; }
       if (showDateRangeModal) { setShowDateRangeModal(false); return true; }
       
       Alert.alert('Exit App', 'Are you sure you want to exit?', [
@@ -173,7 +179,7 @@ export default function CashierDashboard({ navigation }) {
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
-  }, [showInvoice, showFutureSaleModal, showOrderHistory, showDateRangeModal]);
+  }, [showInvoice, showFutureSaleModal, showOrderHistory, showAcReportModal, showDateRangeModal]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -227,12 +233,12 @@ export default function CashierDashboard({ navigation }) {
       if (e.key === 'F10') {
         e.preventDefault();
         e.stopPropagation();
-        handlePrintReport('hourly');
+        handlePrintReport('hourly', null, null, 'non-ac');
       }
       if (e.key === 'F11') {
         e.preventDefault();
         e.stopPropagation();
-        handlePrintReport('items');
+        handlePrintReport('items', null, null, 'non-ac');
       }
       if (e.key === 'F12') {
         e.preventDefault();
@@ -447,6 +453,10 @@ export default function CashierDashboard({ navigation }) {
     const totalAmt = cart.reduce((sum, item) => sum + item.amount, 0);
     const extraNum = parseFloat(extraCharge) || 0;
     const finalTotal = totalAmt + extraNum;
+    const isCurrentAC = isAC;
+    const tableNumber = isCurrentAC
+      ? (orderType === 'take-away' ? 'takeaway (AC)' : orderType === 'delivery' ? 'delivery (AC)' : '1 (AC)')
+      : (orderType === 'take-away' ? 'takeaway' : '1');
 
     // Stable, globally-unique id generated on the terminal BEFORE the request.
     // It is reused for every retry, so if the server already stored this sale
@@ -464,7 +474,7 @@ export default function CashierDashboard({ navigation }) {
     const payload = {
       client_order_id: clientOrderId,
       order_type: orderType === 'take-away' ? 'TAKEAWAY' : orderType === 'delivery' ? 'DELIVERY' : 'DINE_IN',
-      table_number: orderType === 'take-away' ? 'takeaway' : '1',
+      table_number: tableNumber,
       payment_method: paymentMethod,
       cart: cart.filter(c => c.qty && !isNaN(parseFloat(c.qty)) && parseFloat(c.qty) > 0).map(c => ({ id: c.id, quantity: parseFloat(c.qty), price: c.rate })),
       subtotal: totalAmt,
@@ -478,12 +488,30 @@ export default function CashierDashboard({ navigation }) {
       timestamp: new Date().toISOString(),
       business_date: businessDate,
       bill_no: issuedBillNo,
+      is_ac: isCurrentAC,
     };
 
     const dateStr = businessDate;
     // Local receipt backup is written FIRST and keyed by the unique client id,
     // so no two bills can ever overwrite each other's backup file.
     backupData('Cashier', 'Receipts', `Receipt_${dateStr}_${issuedBillNo}_${clientOrderId}.json`, payload);
+
+    saveLocalBill({
+      ...payload,
+      id: issuedBillNo,
+      bill_no: issuedBillNo,
+      order_id: issuedBillNo,
+      branch_order_id: issuedBillNo,
+      date: dateStr,
+      items: cart.filter(c => c.qty && parseFloat(c.qty) > 0).map(c => ({
+        name: c.description,
+        quantity: parseFloat(c.qty),
+        price: c.rate,
+        amount: c.amount
+      }))
+    }, user?.restaurant_id);
+
+    setLastIsAC(isCurrentAC);
 
     api.post(`/api/v1/orders?restaurant_id=${user?.restaurant_id}`, payload, {
       headers: { 'Idempotency-Key': clientOrderId },
@@ -594,7 +622,7 @@ export default function CashierDashboard({ navigation }) {
               <span>${currentDate}</span>
             </div>
             <div>
-              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : orderType === 'delivery' ? 'Delivery' : 'Dine In'} | 
+              <span class="bold">Mode: </span>${orderType === 'take-away' ? 'Take Away' : orderType === 'delivery' ? 'Delivery' : 'Dine In'} ${isCurrentAC ? '(AC)' : '(NON-AC)'} | 
               <span class="bold">Pay: </span>${paymentMethod || 'Cash'}
             </div>
             ${customerName ? `<div><span class="bold">Customer: </span>${customerName}</div>` : ''}
@@ -707,7 +735,7 @@ export default function CashierDashboard({ navigation }) {
   };
 
   const handleShowHistoryBill = (order) => {
-    setLastBillNo(order.order_id);
+    setLastBillNo(order.bill_no || order.order_id);
     let type = 'dine-in';
     if (!order.table_number || order.table_number.toLowerCase().includes('takeaway')) {
       type = 'take-away';
@@ -715,23 +743,74 @@ export default function CashierDashboard({ navigation }) {
     setLastOrderType(type);
     setLastPaymentMethod(order.payment_method);
     setLastFutureSale(null);
-    const mappedCart = (order.items || []).map(item => ({
-      description: item.name,
-      qty: item.quantity,
-      amount: item.price
+    const mappedCart = (order.items || order.cart || []).map(item => ({
+      description: item.name || item.description,
+      qty: item.quantity !== undefined ? item.quantity : item.qty,
+      amount: item.price !== undefined ? item.price : item.amount
     }));
     setLastCart(mappedCart);
     setLastBillAmt(order.total_amount);
+    setLastIsAC(isAcOrder(order));
     setShowInvoice(true);
   };
 
-  const handlePrintReport = async (type, startDate, endDate) => {
+  const handlePrintReport = async (type, startDate, endDate, acFilter = 'non-ac') => {
     try {
-      let data;
+      const targetDate = startDate || new Date().toISOString().split('T')[0];
+      const localBills = getLocalBills(user?.restaurant_id);
+      const localAcMap = {};
+      localBills.forEach(b => {
+        if (b.is_ac) localAcMap[String(b.bill_no || b.order_id || '')] = true;
+      });
+
+      let orders = [];
+      try {
+        let orderParams = `date=${targetDate}&restaurant_id=${user?.restaurant_id || ''}`;
+        const ordersRes = await api.get(`/api/v1/orders?${orderParams}`);
+        orders = Array.isArray(ordersRes.data) ? ordersRes.data : (ordersRes.data?.data || []);
+      } catch (err) {
+        console.warn('Could not fetch server orders, using local bills', err);
+      }
+
+      const mergedMap = new Map();
+      orders.forEach(o => mergedMap.set(String(o.bill_no || o.order_id || o.branch_order_id), o));
+      localBills.filter(b => {
+        const bDate = b.date || (b.timestamp ? b.timestamp.split('T')[0] : '');
+        if (startDate && endDate) {
+          return bDate >= startDate && bDate <= endDate;
+        }
+        return bDate === targetDate;
+      }).forEach(b => {
+        const k = String(b.bill_no || b.order_id);
+        if (!mergedMap.has(k)) mergedMap.set(k, b);
+      });
+      const allOrders = Array.from(mergedMap.values());
+
+      let filteredOrders = [];
+      if (acFilter === 'ac') {
+        filteredOrders = allOrders.filter(o => isAcOrder(o, localAcMap));
+      } else {
+        filteredOrders = allOrders.filter(o => !isAcOrder(o, localAcMap));
+      }
+
+      if (filteredOrders.length > 0) {
+        const reportData = buildReportFromOrders(filteredOrders, type, restaurantData, targetDate, acFilter);
+        const printContent = generateReportHtml(reportData, type, acFilter);
+        printReportHtml(printContent, () => {
+          setTimeout(() => { productCodeRef.current?.focus(); }, 100);
+        });
+        return;
+      }
+
+      // Fallback to server endpoint if filtered orders list is empty
       let params = `restaurant_id=${user?.restaurant_id || ''}`;
       if (startDate && endDate) {
-          params += `&start_date=${startDate}&end_date=${endDate}`;
+        params += `&start_date=${startDate}&end_date=${endDate}`;
+      } else {
+        params += `&date=${targetDate}`;
       }
+
+      let data;
       if (type === 'hourly') {
         const res = await api.get(`/api/v1/reports/hourly?${params}`);
         data = res.data;
@@ -740,94 +819,14 @@ export default function CashierDashboard({ navigation }) {
         data = res.data;
       }
 
-      let tableRows = '';
-      if (type === 'hourly') {
-        tableRows = (data.timeline || []).filter(t => Math.round(t.sales) > 0).map(t => `
-          <div class="row">
-            <span>${t.time}</span>
-            <span>${Math.round(t.sales)}</span>
-          </div>
-        `).join('');
-      } else {
-        tableRows = (data.items || []).map(item => `
-          <div class="item-row">
-            <span class="item-name">${item.name}</span>
-            <span class="item-qty">${Number(item.qty)}</span>
-            <span class="item-amt">${item.amount.toFixed(2)}</span>
-          </div>
-        `).join('');
-      }
-
-      const itemHeader = type === 'hourly' ? '' : `
-        <div class="item-row" style="border-bottom: 1px dashed #000; border-top: 1px dashed #000; padding: 5px 0; margin-bottom: 5px; font-weight: bold;">
-          <span class="item-name">Item Name</span>
-          <span class="item-qty">Qty</span>
-          <span class="item-amt">Amount</span>
-        </div>
-      `;
-
-      const printContent = `
-        <html>
-          <head>
-            <title>Print Receipt</title>
-            <style>
-              @page { margin: 0; }
-              body { font-family: monospace; font-size: 12px; margin: 0; padding: 0 5px 0 10px; width: 100%; max-width: 68mm; box-sizing: border-box; color: #000; }
-              .header { text-align: center; margin-bottom: 10px; }
-              .header h1 { font-size: 16px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: 900; }
-              .header p { margin: 0 0 4px 0; text-transform: uppercase; }
-              .row { display: flex; justify-content: space-between; transform: scaleY(1.2); transform-origin: top left; margin-bottom: 6px; }
-              .item-row { display: flex; justify-content: space-between; transform: scaleY(1.2); transform-origin: top left; margin-bottom: 6px; }
-              .item-name { flex: 1; word-break: break-word; padding-right: 5px; text-transform: uppercase; }
-              .item-qty { width: 40px; text-align: center; }
-              .item-amt { width: 65px; text-align: right; }
-              .total-row { border-top: 1px dashed #000; margin-top: 15px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; transform: scaleY(1.7); transform-origin: top left; margin-bottom: 12px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>${(data.restaurant && data.restaurant.name) || 'DATAUDIPI HOTEL'}</h1>
-              <p>${(data.restaurant && data.restaurant.address) || 'MUGALIVAKKAM, CHENNAI'}</p>
-              <p>PH:${(data.restaurant && data.restaurant.phone) || '9597066563'} GSTIN: ${(data.restaurant && data.restaurant.gstin) || '33ADLPV4810B3ZQ'}</p>
-              <h2 style="font-size: 14px; margin: 10px 0 5px 0;">${type === 'hourly' ? 'HOURLY REPORT' : 'ITEM WISE REPORT'}</h2>
-              <div style="text-align: left; margin-top: 10px;">
-                ${type === 'hourly' 
-                  ? `<p>Date: ${data.date}</p>` 
-                  : `<p>Print Date: ${data.date}</p><p>Bills From: ${data.date}</p><p>To: ${data.date}</p>`}
-                <p>Starting BillNo: ${(data.starting_bill && data.starting_bill.no) || '-'} - ${(data.starting_bill && data.starting_bill.time) || '-'}</p>
-                <p>Ending BillNo: ${(data.ending_bill && data.ending_bill.no) || '-'} - ${(data.ending_bill && data.ending_bill.time) || '-'}</p>
-              </div>
-            </div>
-            
-            ${itemHeader}
-            ${tableRows}
-            
-            <div class="total-row">
-              <span>TOTAL SALES</span>
-              <span>${data.total_sales ? data.total_sales.toFixed(2) : '0.00'}</span>
-            </div>
-          </body>
-        </html>
-      `;
-
-      if (window.electronAPI && window.electronAPI.printSilent) {
-        window.electronAPI.printSilent(printContent).then(() => {
-          setTimeout(() => { productCodeRef.current?.focus(); }, 100);
-        });
-      } else {
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        iframe.contentWindow.document.open();
-        iframe.contentWindow.document.write(printContent);
-        iframe.contentWindow.document.close();
-        iframe.contentWindow.focus();
-        setTimeout(() => {
-          iframe.contentWindow.print();
-          document.body.removeChild(iframe);
-        }, 500);
-      }
+      data.restaurant = data.restaurant || restaurantData;
+      data.acMode = acFilter;
+      const printContent = generateReportHtml(data, type, acFilter);
+      printReportHtml(printContent, () => {
+        setTimeout(() => { productCodeRef.current?.focus(); }, 100);
+      });
     } catch (e) {
+      console.error(e);
       alert("Failed to print report.");
     }
   };
@@ -991,7 +990,7 @@ export default function CashierDashboard({ navigation }) {
         <View style={[styles.leftPanel, { flex: isTablet ? leftFlex : 1 }]}>
 
           <View style={styles.inputStack}>
-            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={orderType} onValueChange={(val) => setOrderType(val)} style={styles.picker} dataSet={{ zone: '0', index: '0' }}>
                   <Picker.Item label="[7] Take Away" value="take-away" />
@@ -999,11 +998,17 @@ export default function CashierDashboard({ navigation }) {
                   <Picker.Item label="Delivery" value="delivery" />
                 </Picker>
               </View>
-              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('hourly')}>
+              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('hourly', null, null, 'non-ac')}>
                 <Text style={styles.reportBtnText}>Hourly Report</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('items')}>
+              <TouchableOpacity style={styles.reportBtn} onPress={() => handlePrintReport('items', null, null, 'non-ac')}>
                 <Text style={styles.reportBtnText}>Item Report</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.reportBtn, { backgroundColor: '#e0f2fe', borderColor: '#38bdf8' }]} 
+                onPress={() => setShowAcReportModal(true)}
+              >
+                <Text style={[styles.reportBtnText, { color: '#0369a1', fontWeight: 'bold' }]}>AC Report</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.reportBtn} onPress={handlePrintItemCodes}>
                 <Text style={styles.reportBtnText}>Item Code</Text>
@@ -1225,6 +1230,7 @@ export default function CashierDashboard({ navigation }) {
         restaurantData={restaurantData}
         lastCustomerName={lastCustomerName}
         lastCustomerPhone={lastCustomerPhone}
+        lastIsAC={lastIsAC}
       />
       <FutureSaleModal show={showFutureSaleModal} setShow={setShowFutureSaleModal} futureSale={futureSale} setFutureSale={setFutureSale} />
       
@@ -1234,14 +1240,24 @@ export default function CashierDashboard({ navigation }) {
           setShow={setShowDateRangeModal}
           dateRange={dateRange}
           setDateRange={setDateRange}
-          onPrint={handlePrintReport}
+          onPrint={(type, start, end, acFilter) => handlePrintReport(type, start, end, acFilter || 'non-ac')}
           reportType={dateRangeReportType}
           setDateRangeReportType={setDateRangeReportType}
+          acFilter={dateRangeAcFilter}
+          setAcFilter={setDateRangeAcFilter}
         />
       )}
       <OrderHistoryModal
         show={showOrderHistory}
         setShow={setShowOrderHistory}
+        restaurantData={restaurantData}
+        api={api}
+        user={user}
+        onShowBill={handleShowHistoryBill}
+      />
+      <AcReportModal
+        show={showAcReportModal}
+        setShow={setShowAcReportModal}
         restaurantData={restaurantData}
         api={api}
         user={user}

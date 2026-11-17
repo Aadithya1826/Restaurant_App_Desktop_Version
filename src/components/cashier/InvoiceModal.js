@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
-const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMethod, lastFutureSale, lastCart, lastBillAmt, restaurantData, lastCustomerName, lastCustomerPhone }) => {
+const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMethod, lastFutureSale, lastCart, lastBillAmt, restaurantData, lastCustomerName, lastCustomerPhone, lastIsAC }) => {
   if (!show) return null;
   
   const currentDate = new Date().toLocaleString('en-US', {
@@ -40,6 +40,7 @@ const InvoiceModal = ({ show, setShow, lastBillNo, lastOrderType, lastPaymentMet
               <Text style={styles.textNormal}>
                 <Text style={styles.textBold}>Mode: </Text>
                 {lastOrderType === 'take-away' ? 'Take Away' : 'Dine In'}
+                {lastIsAC ? ' (AC)' : ' (NON-AC)'}
                 <Text> | </Text>
                 <Text style={styles.textBold}>Pay: </Text>
                 {lastPaymentMethod || 'Cash'}

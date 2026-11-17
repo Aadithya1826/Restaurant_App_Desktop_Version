@@ -90,7 +90,7 @@ export default function OrdersManagement() {
   };
 
   const isDelivery = (order) => order.order_type?.toLowerCase() === 'delivery';
-  const isTakeaway = (order) => !isDelivery(order) && (!order.table_number || order.table_number === 'N/A' || order.table_number.toString().toLowerCase() === 'takeaway');
+  const isTakeaway = (order) => !isDelivery(order) && (!order.table_number || order.table_number === 'N/A' || order.table_number.toString().toLowerCase().includes('takeaway'));
   const isDineIn = (order) => !isDelivery(order) && !isTakeaway(order);
 
   const dineInOrders = orders.filter(o => isDineIn(o));
