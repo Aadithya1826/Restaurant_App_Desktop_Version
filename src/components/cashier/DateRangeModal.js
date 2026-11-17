@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
-const DateRangeModal = ({ show, setShow, dateRange, setDateRange, onPrint, reportType, setDateRangeReportType }) => {
+const DateRangeModal = ({ show, setShow, dateRange, setDateRange, onPrint, reportType, setDateRangeReportType, acFilter = 'non-ac', setAcFilter }) => {
   return (
     <Modal visible={show} transparent animationType="slide">
       <View style={styles.modalOverlay}>
@@ -19,6 +19,22 @@ const DateRangeModal = ({ show, setShow, dateRange, setDateRange, onPrint, repor
               onPress={() => setDateRangeReportType('items')}
             >
               <Text style={[styles.typeText, reportType === 'items' && styles.activeTypeText]}>Item Report</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.label}>Bill Type:</Text>
+          <View style={[styles.typeSelector, { marginBottom: 15 }]}>
+            <TouchableOpacity 
+              style={[styles.typeButton, (acFilter || 'non-ac') === 'non-ac' && styles.activeTypeButton]} 
+              onPress={() => setAcFilter && setAcFilter('non-ac')}
+            >
+              <Text style={[styles.typeText, (acFilter || 'non-ac') === 'non-ac' && styles.activeTypeText]}>NON-AC</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.typeButton, acFilter === 'ac' && styles.activeTypeButton]} 
+              onPress={() => setAcFilter && setAcFilter('ac')}
+            >
+              <Text style={[styles.typeText, acFilter === 'ac' && styles.activeTypeText]}>AC</Text>
             </TouchableOpacity>
           </View>
           
@@ -64,7 +80,7 @@ const DateRangeModal = ({ show, setShow, dateRange, setDateRange, onPrint, repor
               style={styles.saveButton} 
               onPress={() => {
                 setShow(false);
-                onPrint(reportType, dateRange.startDate, dateRange.endDate);
+                onPrint(reportType, dateRange.startDate, dateRange.endDate, acFilter || 'non-ac');
               }}
             >
               <Text style={{ color: 'white', fontWeight: 'bold' }}>Print Report</Text>

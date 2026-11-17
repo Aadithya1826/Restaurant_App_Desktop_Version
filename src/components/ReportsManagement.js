@@ -171,6 +171,10 @@ export default function ReportsManagement() {
             <Printer size={16} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.primaryBtnText}>Item Wise Report</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: '#e0f2fe', borderColor: '#38bdf8' }]} onPress={() => setReportPrintType('ac')}>
+            <Printer size={16} color="#0284c7" style={{ marginRight: 8 }} />
+            <Text style={[styles.secondaryBtnText, { color: '#0284c7', fontWeight: 'bold' }]}>AC Report</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
